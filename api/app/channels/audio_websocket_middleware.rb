@@ -449,7 +449,14 @@ class AudioWebSocketMiddleware
     end
 
     state.latest_resumption_token = resumption_token
-    session.update_column(:gemini_resumption_token, resumption_token)
+    session_id = session.id
+    Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        Session.where(id: session_id).update_all(gemini_resumption_token: resumption_token)
+      end
+    rescue StandardError => e
+      Rails.logger.error("[AudioWS] Failed to persist GoAway resumption token: #{e.class}: #{e.message}")
+    end
 
     old_client = state.gemini_client
     old_client&.supersede!
@@ -574,7 +581,14 @@ class AudioWebSocketMiddleware
       send_json(browser_ws, type: 'speaker_changed', speaker: 'candidate')
     end
 
-    state.session.update_column(:gemini_resumption_token, token)
+    session_id = state.session.id
+    Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        Session.where(id: session_id).update_all(gemini_resumption_token: token)
+      end
+    rescue StandardError => e
+      Rails.logger.error("[AudioWS] Failed to persist proactive resumption token: #{e.class}: #{e.message}")
+    end
 
     old_client = state.gemini_client
     old_client&.supersede!

@@ -241,4 +241,32 @@ RSpec.describe AudioWebSocketMiddleware do
       middleware.send(:handle_browser_frame, event, mock_ws, state, session.id)
     end
   end
+
+  describe 'async reactor offloading for GoAway token persistence (EVENT-01)' do
+    it 'persists resumption token asynchronously in a background thread' do
+      mock_old_gemini = double('Gemini::LiveClient', supersede!: true, close: true)
+      mock_new_gemini = double('Gemini::LiveClient', connect: true)
+      state.session = session
+      state.gemini_client = mock_old_gemini
+
+      allow(middleware).to receive(:build_gemini_client) do
+        state.gemini_client = mock_new_gemini
+      end
+
+      thread_spawned = false
+      allow(Thread).to receive(:new).and_wrap_original do |m, *args, &block|
+        thread_spawned = true
+        m.call(*args, &block)
+      end
+
+      token = 'goaway_token_12345'
+      middleware.send(:handle_go_away, mock_ws, state, token)
+
+      expect(thread_spawned).to be true
+      expect(state.latest_resumption_token).to eq(token)
+
+      sleep 0.1
+      expect(session.reload.gemini_resumption_token).to eq(token)
+    end
+  end
 end
