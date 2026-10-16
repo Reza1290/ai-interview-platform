@@ -112,6 +112,33 @@ class AudioWebSocketMiddleware
       return
     end
 
+    if session.ended?
+      browser_ws.send({ type: 'session_ended', reason: session.end_reason || 'session_ended' }.to_json)
+      browser_ws.close rescue nil
+      return
+    end
+
+    # Disconnect any previous active browser connection for this session to enforce single-tab active sessions
+    old_conns = @@active_connections[session_id.to_s] || []
+    old_conns.each do |old_conn|
+      old_ws = old_conn[:ws]
+      next if old_ws == browser_ws
+      begin
+        old_ws.send({
+          type: 'session_replaced',
+          code: 'duplicate_tab',
+          message: 'This interview was opened in another window or tab. This window has been disconnected.'
+        }.to_json)
+        if Rails.env.test?
+          old_ws.close rescue nil
+        else
+          EM.add_timer(0.1) { old_ws.close rescue nil }
+        end
+      rescue StandardError => e
+        Rails.logger.warn("[AudioWS] Failed to close replaced socket: #{e.message}")
+      end
+    end
+
     # Cancel previous disconnect grace period timer if candidate reconnects
     existing_state = @@active_states[session_id.to_s]
     if existing_state
@@ -122,7 +149,7 @@ class AudioWebSocketMiddleware
       end
     end
     @@active_states[session_id.to_s] = state
-    @@active_connections[session_id.to_s] << { ws: browser_ws, state: state }
+    @@active_connections[session_id.to_s] = [{ ws: browser_ws, state: state }]
 
     state.session = session
     connect_to_gemini(browser_ws, state)

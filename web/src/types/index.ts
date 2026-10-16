@@ -194,7 +194,8 @@ export type InterviewState =
   | "draining_audio"
   | "ending"
   | "complete"
-  | "error";
+  | "error"
+  | "replaced";
 
 export type InterviewSpeaker = "ai" | "candidate" | null;
 
@@ -202,6 +203,7 @@ export interface WsControlMessage {
   type:
     | "session_started"
     | "session_ended"
+    | "session_replaced"
     | "transcript"
     | "transcription"
     | "reconnecting"

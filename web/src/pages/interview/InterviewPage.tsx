@@ -53,11 +53,10 @@ export default function InterviewPage() {
         if (res.data.consent_given) setConsentAgreed(true);
         if (res.data.candidate_name) setEditedName(res.data.candidate_name);
         if (res.data.session_status === "ended") {
-          const validEndReasons = ["manual_candidate", "manual_assessor", "all_covered", "time_ceiling"];
-          if (validEndReasons.includes(res.data.end_reason || "")) {
-            setInterviewState("complete");
-          } else {
+          if (res.data.end_reason === "error") {
             setInterviewState("error");
+          } else {
+            setInterviewState("complete");
           }
         }
       })
@@ -361,7 +360,6 @@ export default function InterviewPage() {
   if (interviewState === "complete") {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-        <div className="text-4xl">✅</div>
         <h2 className="text-xl font-semibold">Interview Complete</h2>
         <p className="text-sm text-muted-foreground">
           Thank you. The interview has been recorded.
@@ -372,11 +370,23 @@ export default function InterviewPage() {
     );
   }
 
+  if (interviewState === "replaced") {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+        <h2 className="text-xl font-semibold">Active in Another Window</h2>
+        <p className="text-sm text-muted-foreground">
+          This interview session was opened in another browser tab or window.
+          <br />
+          This window has been disconnected to prevent audio conflicts.
+        </p>
+      </div>
+    );
+  }
+
   // ── State G: Error / Connection Interrupted ─────────────────────────────
   if (interviewState === "error") {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-        <div className="text-4xl">⚠️</div>
         <h2 className="text-xl font-semibold">Connection Interrupted</h2>
         <p className="text-sm text-muted-foreground">
           A network or server error interrupted the interview connection.
