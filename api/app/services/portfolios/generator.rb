@@ -150,39 +150,72 @@ module Portfolios
     def save_skills(portfolio, response)
       data = response.is_a?(Hash) ? response : JSON.parse(response)
 
-      # Destroy existing skills (idempotent regeneration)
-      portfolio.portfolio_skills.destroy_all
+      ActiveRecord::Base.transaction do
+        existing_skills = portfolio.portfolio_skills.includes(:assessor_override).to_a
+        processed_skill_ids = []
 
-      (data['configured_skills'] || []).each do |skill_data|
-        raw_level = skill_data['level']
-        level = raw_level.present? ? raw_level.to_i.clamp(1, 5) : nil
-        summary = skill_data['competency_summary'].presence || (level.nil? ? 'Skill not assessed during interview.' : '')
+        (data['configured_skills'] || []).each do |skill_data|
+          raw_level = skill_data['level']
+          level = raw_level.present? ? raw_level.to_i.clamp(1, 5) : nil
+          summary = skill_data['competency_summary'].presence || (level.nil? ? 'Skill not assessed during interview.' : '')
 
-        portfolio.portfolio_skills.create!(
-          skill_id:           skill_data['skill_id'],
-          skill_label:        skill_data['skill_label'],
-          is_discovered:      false,
-          ai_level:           level,
-          ai_confidence:      skill_data['confidence'].presence,
-          evidence:           Array(skill_data['evidence']).first(3),
-          competency_summary: summary
-        )
-      end
+          skill = existing_skills.find do |s|
+            (s.skill_id.present? && s.skill_id == skill_data['skill_id']) ||
+              s.skill_label.casecmp?(skill_data['skill_label'])
+          end
 
-      (data['discovered_skills'] || []).each do |skill_data|
-        raw_level = skill_data['level']
-        level = raw_level.present? ? raw_level.to_i.clamp(1, 5) : nil
-        summary = skill_data['competency_summary'].presence || (level.nil? ? 'Skill not assessed during interview.' : '')
+          attributes = {
+            skill_id:           skill_data['skill_id'],
+            skill_label:        skill_data['skill_label'],
+            is_discovered:      false,
+            ai_level:           level,
+            ai_confidence:      skill_data['confidence'].presence,
+            evidence:           Array(skill_data['evidence']).first(3),
+            competency_summary: summary
+          }
 
-        portfolio.portfolio_skills.create!(
-          skill_id:           nil,
-          skill_label:        skill_data['skill_label'],
-          is_discovered:      true,
-          ai_level:           level,
-          ai_confidence:      skill_data['confidence'].presence,
-          evidence:           Array(skill_data['evidence']).first(3),
-          competency_summary: summary
-        )
+          if skill
+            skill.update!(attributes)
+          else
+            skill = portfolio.portfolio_skills.create!(attributes)
+          end
+          processed_skill_ids << skill.id
+        end
+
+        (data['discovered_skills'] || []).each do |skill_data|
+          raw_level = skill_data['level']
+          level = raw_level.present? ? raw_level.to_i.clamp(1, 5) : nil
+          summary = skill_data['competency_summary'].presence || (level.nil? ? 'Skill not assessed during interview.' : '')
+
+          skill = existing_skills.find do |s|
+            s.is_discovered? && s.skill_label.casecmp?(skill_data['skill_label'])
+          end
+
+          attributes = {
+            skill_id:           nil,
+            skill_label:        skill_data['skill_label'],
+            is_discovered:      true,
+            ai_level:           level,
+            ai_confidence:      skill_data['confidence'].presence,
+            evidence:           Array(skill_data['evidence']).first(3),
+            competency_summary: summary
+          }
+
+          if skill
+            skill.update!(attributes)
+          else
+            skill = portfolio.portfolio_skills.create!(attributes)
+          end
+          processed_skill_ids << skill.id
+        end
+
+        # Remove orphaned skills without human overrides
+        existing_skills.each do |old_skill|
+          next if processed_skill_ids.include?(old_skill.id)
+          next if old_skill.assessor_override.present?
+
+          old_skill.destroy!
+        end
       end
     end
   end
