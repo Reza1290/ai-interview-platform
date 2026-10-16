@@ -132,7 +132,7 @@ class AudioWebSocketMiddleware
   end
 
   def handle_browser_frame(event, browser_ws, state, session_id)
-    if event.data.is_a?(String) && !event.data.start_with?('{')
+    if event.data.is_a?(Array) || (event.data.is_a?(String) && event.data.encoding == Encoding::BINARY)
       forward_audio_frame(event.data, state, session_id, browser_ws)
     else
       handle_browser_message(event.data, browser_ws, state)
@@ -152,6 +152,8 @@ class AudioWebSocketMiddleware
       return
     end
 
+    raw_bytes = data.is_a?(Array) ? data.pack('C*') : data
+
     if state.model_speaking
       # Server-side audio gate: suppress mic while model is speaking to prevent speaker echo loop.
       unless state.logged_gate_suppressed
@@ -160,7 +162,7 @@ class AudioWebSocketMiddleware
       end
     elsif state.gemini_client&.accepting_audio?
       state.logged_gate_suppressed = false
-      state.gemini_client.send_audio(data)
+      state.gemini_client.send_audio(raw_bytes)
     else
       # Log once per gap to avoid spam (~33 chunks/s during reconnection).
       unless state.logged_not_ready
