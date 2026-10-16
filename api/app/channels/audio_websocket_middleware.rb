@@ -721,14 +721,16 @@ class AudioWebSocketMiddleware
     Rails.logger.error("[AudioWS] Coverage cache refresh failed: #{e.message}")
   end
 
-  def save_transcript_turn(session, turn_number, speaker, text)
-    session.transcript_turns.create!(
-      turn_number: turn_number,
-      speaker: speaker,
-      text: text
-    )
-  rescue ActiveRecord::RecordNotUnique
-    # Duplicate turn — skip silently (idempotent)
+  def save_transcript_turn(session, _suggested_turn_number, speaker, text)
+    ActiveRecord::Base.transaction do
+      session.lock!
+      next_turn_number = (session.transcript_turns.maximum(:turn_number) || 0) + 1
+      session.transcript_turns.create!(
+        turn_number: next_turn_number,
+        speaker:     speaker,
+        text:        text
+      )
+    end
   rescue StandardError => e
     Rails.logger.error("[AudioWS] Failed to save transcript turn: #{e.message}")
   end

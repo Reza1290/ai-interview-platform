@@ -134,4 +134,25 @@ RSpec.describe AudioWebSocketMiddleware do
       expect(AudioWebSocketMiddleware.active_connections[session.id.to_s]).to be_empty
     end
   end
+
+  describe '#save_transcript_turn atomic concurrency' do
+    it 'persists concurrent turns across multiple parallel threads without RecordNotUnique or drops' do
+      threads = []
+      turns_count = 10
+
+      turns_count.times do |i|
+        threads << Thread.new do
+          ActiveRecord::Base.connection_pool.with_connection do
+            middleware.send(:save_transcript_turn, session, i + 1, 'candidate', "Turn content #{i}")
+          end
+        end
+      end
+
+      threads.each(&:join)
+
+      saved_turns = session.transcript_turns.order(:turn_number)
+      expect(saved_turns.count).to eq(turns_count)
+      expect(saved_turns.pluck(:turn_number)).to eq((1..turns_count).to_a)
+    end
+  end
 end
