@@ -155,4 +155,50 @@ RSpec.describe AudioWebSocketMiddleware do
       expect(saved_turns.pluck(:turn_number)).to eq((1..turns_count).to_a)
     end
   end
+
+  describe 'multi-tab zombie teardown (CONC-02)' do
+    it 'drops incoming audio frames and closes the socket when the session has ended' do
+      session.update!(status: 'ended', end_reason: 'manual_candidate')
+      state.session = session
+      mock_gemini = double('Gemini::LiveClient', send_audio: true, close: true)
+      state.gemini_client = mock_gemini
+      mock_browser_ws = double('Faye::WebSocket', send: true, close: true)
+
+      expect(mock_gemini).not_to receive(:send_audio)
+      expect(mock_gemini).to receive(:close).once
+      expect(mock_browser_ws).to receive(:send).with(include('session_ended'))
+      expect(mock_browser_ws).to receive(:close).once
+
+      middleware.send(:forward_audio_frame, 'dummy pcm data', state, session.id, mock_browser_ws)
+    end
+
+    it 'tears down all secondary tabs when a session terminates' do
+      mock_gemini_tab_a = double('Gemini::LiveClient', close: true)
+      mock_gemini_tab_b = double('Gemini::LiveClient', close: true)
+      state_tab_a = AudioWebSocketMiddleware::ConnectionState.new
+      state_tab_a.session = session
+      state_tab_a.gemini_client = mock_gemini_tab_a
+      state_tab_b = AudioWebSocketMiddleware::ConnectionState.new
+      state_tab_b.session = session
+      state_tab_b.gemini_client = mock_gemini_tab_b
+
+      ws_tab_a = double('Faye::WebSocket', send: true, close: true)
+      ws_tab_b = double('Faye::WebSocket', send: true, close: true)
+
+      AudioWebSocketMiddleware.active_states[session.id.to_s] = state_tab_a
+      AudioWebSocketMiddleware.active_connections[session.id.to_s] = [
+        { ws: ws_tab_a, state: state_tab_a },
+        { ws: ws_tab_b, state: state_tab_b }
+      ]
+
+      expect(ws_tab_a).to receive(:send).with(include('session_ended'))
+      expect(ws_tab_b).to receive(:send).with(include('session_ended'))
+      expect(mock_gemini_tab_a).to receive(:close).once
+      expect(mock_gemini_tab_b).to receive(:close).once
+
+      AudioWebSocketMiddleware.terminate_session_connections(session.id, reason: 'manual_candidate')
+
+      expect(AudioWebSocketMiddleware.active_connections[session.id.to_s]).to be_empty
+    end
+  end
 end
