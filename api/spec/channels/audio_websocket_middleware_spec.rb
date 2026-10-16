@@ -201,4 +201,44 @@ RSpec.describe AudioWebSocketMiddleware do
       expect(AudioWebSocketMiddleware.active_connections[session.id.to_s]).to be_empty
     end
   end
+
+  describe 'binary PCM frame classification (FRAME-01)' do
+    let(:mock_gemini) { double('Gemini::LiveClient', accepting_audio?: true, send_audio: true) }
+
+    before do
+      state.session = session
+      state.gemini_client = mock_gemini
+      state.model_speaking = false
+    end
+
+    it 'forwards binary PCM starting with 0x7B as audio and does not parse as JSON' do
+      binary_pcm = [0x7B, 0x00, 0x12, 0x34].pack('C*')
+      event = double('Faye::WebSocket::Event', data: binary_pcm)
+
+      expect(middleware).not_to receive(:handle_browser_message)
+      expect(mock_gemini).to receive(:send_audio).with(binary_pcm)
+
+      middleware.send(:handle_browser_frame, event, mock_ws, state, session.id)
+    end
+
+    it 'forwards array byte frames as audio' do
+      byte_array = [0x7B, 0x01, 0x02, 0x03]
+      event = double('Faye::WebSocket::Event', data: byte_array)
+
+      expect(middleware).not_to receive(:handle_browser_message)
+      expect(mock_gemini).to receive(:send_audio).with(byte_array.pack('C*'))
+
+      middleware.send(:handle_browser_frame, event, mock_ws, state, session.id)
+    end
+
+    it 'routes UTF-8 text frames to handle_browser_message' do
+      json_text = '{"type":"end_session"}'
+      event = double('Faye::WebSocket::Event', data: json_text)
+
+      expect(middleware).to receive(:handle_browser_message).with(json_text, mock_ws, state)
+      expect(mock_gemini).not_to receive(:send_audio)
+
+      middleware.send(:handle_browser_frame, event, mock_ws, state, session.id)
+    end
+  end
 end
