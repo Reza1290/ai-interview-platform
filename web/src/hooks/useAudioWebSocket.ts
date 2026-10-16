@@ -106,6 +106,11 @@ export function useAudioWebSocket({
                 onStateChange("complete");
               }
               break;
+            case "session_replaced":
+              sessionEndedRef.current = true;
+              reconnectAttemptsRef.current = RECONNECT_DELAYS.length;
+              onStateChange("replaced");
+              break;
             case "error":
               if (!msg.recoverable) onStateChange("error");
               break;
