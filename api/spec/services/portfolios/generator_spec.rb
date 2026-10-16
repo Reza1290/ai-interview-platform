@@ -62,5 +62,49 @@ RSpec.describe Portfolios::Generator do
       expect(unassessed.unassessed?).to be true
       expect(unassessed.competency_summary).to eq('Skill not assessed during interview.')
     end
+
+    it 'preserves assessor overrides across regeneration' do
+      initial_portfolio = session.create_portfolio!(generation_status: 'complete')
+      skill = initial_portfolio.portfolio_skills.create!(
+        skill_id: 'sk-01',
+        skill_label: 'Ruby on Rails',
+        ai_level: 2,
+        ai_confidence: 'medium',
+        competency_summary: 'Initial summary'
+      )
+
+      skill.create_assessor_override!(
+        ai_level: 2,
+        override_level: 4,
+        assessor_notes: 'Candidate demonstrated L4 system design during manual code review',
+        overridden_by: 12
+      )
+
+      mock_response = {
+        'configured_skills' => [
+          {
+            'skill_id' => 'sk-01',
+            'skill_label' => 'Ruby on Rails',
+            'level' => 3,
+            'confidence' => 'high',
+            'evidence' => ['new evidence quote'],
+            'competency_summary' => 'Updated AI evaluation'
+          }
+        ],
+        'discovered_skills' => []
+      }.to_json
+
+      allow(mock_gemini_client).to receive(:generate_content).and_return(mock_response)
+
+      updated_portfolio = generator.call
+      reloaded_skill = updated_portfolio.portfolio_skills.find_by(skill_id: 'sk-01')
+
+      expect(reloaded_skill.id).to eq(skill.id)
+      expect(reloaded_skill.ai_level).to eq(3)
+      expect(reloaded_skill.competency_summary).to eq('Updated AI evaluation')
+      expect(reloaded_skill.assessor_override).to be_present
+      expect(reloaded_skill.assessor_override.override_level).to eq(4)
+      expect(reloaded_skill.assessor_override.assessor_notes).to include('Candidate demonstrated L4')
+    end
   end
 end
