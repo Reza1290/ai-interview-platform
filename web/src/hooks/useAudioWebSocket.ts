@@ -154,13 +154,15 @@ export function useAudioWebSocket({
   }, []);
 
   const disconnect = useCallback(() => {
+    sessionEndedRef.current = true;
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-    reconnectAttemptsRef.current = RECONNECT_DELAYS.length; // prevent reconnect
+    reconnectAttemptsRef.current = RECONNECT_DELAYS.length;
     wsRef.current?.close();
   }, []);
 
   useEffect(() => {
     return () => {
+      sessionEndedRef.current = true;
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
     };
