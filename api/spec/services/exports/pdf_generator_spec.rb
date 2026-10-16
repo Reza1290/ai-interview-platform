@@ -65,4 +65,15 @@ RSpec.describe Exports::PdfGenerator do
       described_class.new(portfolio: portfolio).send(:render_skill_card, pdf_doc, unassessed_skill)
     end
   end
+
+  describe 'explicit timezone rendering (TIME-01)' do
+    it 'renders generated timestamp with explicit timezone identifier' do
+      pdf_doc = double('Prawn::Document').as_null_object
+      allow(pdf_doc).to receive(:font_size).and_yield
+
+      expect(pdf_doc).to receive(:text).with(include("Generated: #{Time.current.strftime('%Y-%m-%d %H:%M %Z')}"))
+
+      described_class.new(portfolio: portfolio).send(:render_header, pdf_doc)
+    end
+  end
 end
