@@ -42,6 +42,8 @@ export default function InterviewPage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [isUpdatingName, setIsUpdatingName] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Fetch candidate info
   useEffect(() => {
@@ -94,6 +96,10 @@ export default function InterviewPage() {
 
   const handleStateChange = useCallback((state: InterviewState) => {
     setInterviewState(state);
+
+    if (state === "active") {
+      setRetryCount(0);
+    }
 
     if (state === "draining_audio") {
       // Mute mic, stop sending — wait for audio queue to drain then call audio_complete
@@ -215,8 +221,47 @@ export default function InterviewPage() {
     stopPlayback();
     sendJson({ type: "end_session" });
     disconnect();
+    if (token) {
+      Promise.resolve(sessionsApi.audioComplete(token)).catch(() => {});
+    }
     setInterviewState("complete");
-  }, [stopCapture, stopPlayback, sendJson, disconnect]);
+  }, [stopCapture, stopPlayback, sendJson, disconnect, token]);
+
+  const handleRetryConnection = useCallback(async () => {
+    if (retryCount >= 1) {
+      if (token) {
+        Promise.resolve(sessionsApi.audioComplete(token)).catch(() => {});
+      }
+      setInterviewState("complete");
+      return;
+    }
+
+    setIsRetrying(true);
+    try {
+      if (!token) {
+        setInterviewState("complete");
+        return;
+      }
+
+      const res = await sessionsApi.getCandidateInfo(token);
+      setCandidateInfo(res.data);
+
+      if (res.data.session_status === "ended") {
+        setInterviewState("complete");
+        return;
+      }
+
+      setRetryCount((prev) => prev + 1);
+      setInterviewState("connecting");
+      connect();
+    } catch {
+      setRetryCount((prev) => prev + 1);
+      setInterviewState("connecting");
+      connect();
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [retryCount, token, connect]);
 
   const wsConnectionStatus =
     interviewState === "reconnecting"
@@ -389,19 +434,32 @@ export default function InterviewPage() {
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
         <h2 className="text-xl font-semibold">Connection Interrupted</h2>
         <p className="text-sm text-muted-foreground">
-          A network or server error interrupted the interview connection.
-          <br />
-          You can try reconnecting to continue where you left off.
+          {retryCount >= 1
+            ? "The interview connection could not be restored. You can finalize your interview now."
+            : "A network or server error interrupted the interview connection. You can try reconnecting to continue where you left off."}
         </p>
-        <Button
-          onClick={() => {
-            setInterviewState("connecting");
-            connect();
-          }}
-          className="mt-4"
-        >
-          Retry Connection
-        </Button>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4">
+          <Button
+            onClick={handleRetryConnection}
+            disabled={isRetrying}
+          >
+            {isRetrying ? "Checking connection..." : "Retry Connection"}
+          </Button>
+          {retryCount >= 1 && (
+            <Button
+              variant="outline"
+              disabled={isRetrying}
+              onClick={() => {
+                if (token) {
+                  Promise.resolve(sessionsApi.audioComplete(token)).catch(() => {});
+                }
+                setInterviewState("complete");
+              }}
+            >
+              Finish Interview
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
