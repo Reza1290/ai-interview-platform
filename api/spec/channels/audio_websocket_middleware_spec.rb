@@ -51,4 +51,33 @@ RSpec.describe AudioWebSocketMiddleware do
       expect(session_started_msg['session_id']).to eq(session.id)
     end
   end
+
+  describe '#handle_browser_open ghost timer cancellation' do
+    it 'cancels existing graceful_end_timer on previous state when reconnecting' do
+      old_state = AudioWebSocketMiddleware::ConnectionState.new
+      old_state.session = session
+      mock_timer = double('EM::Timer', cancel: true)
+      old_state.graceful_end_timer = mock_timer
+
+      AudioWebSocketMiddleware.active_states[session.id.to_s] = old_state
+
+      expect(mock_timer).to receive(:cancel).once
+
+      new_state = AudioWebSocketMiddleware::ConnectionState.new
+      mock_browser_ws = double('Faye::WebSocket', send: true, close: true)
+
+      env = {
+        'PATH_INFO' => "/ws/sessions/#{session.id}/audio",
+        'rack.input' => StringIO.new,
+        'QUERY_STRING' => "token=#{session.invite_token}"
+      }
+
+      allow(middleware).to receive(:connect_to_gemini)
+
+      middleware.send(:handle_browser_open, env, session.id.to_s, mock_browser_ws, new_state)
+
+      expect(old_state.graceful_end_timer).to be_nil
+      expect(AudioWebSocketMiddleware.active_states[session.id.to_s]).to eq(new_state)
+    end
+  end
 end
