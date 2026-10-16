@@ -55,6 +55,28 @@ RSpec.describe AudioWebSocketMiddleware do
       expect(session_started_msg).to be_present
       expect(session_started_msg['session_id']).to eq(session.id)
     end
+
+    it 'triggers opening greeting and sets speaker_changed: ai on a fresh start' do
+      messages = []
+      allow(mock_ws).to receive(:send) do |payload|
+        messages << JSON.parse(payload)
+      end
+
+      mock_gemini = double('Gemini::LiveClient', trigger_opening: true)
+      state.gemini_client = mock_gemini
+      state.fresh_start = true
+
+      expect(mock_gemini).to receive(:trigger_opening).once
+      allow(middleware).to receive(:schedule_proactive_reconnect)
+
+      on_ready_cb = middleware.send(:build_on_ready, mock_ws, state, session)
+      on_ready_cb.call
+
+      speaker_msg = messages.find { |m| m['type'] == 'speaker_changed' }
+      expect(speaker_msg).to be_present
+      expect(speaker_msg['speaker']).to eq('ai')
+      expect(state.fresh_start).to be false
+    end
   end
 
   describe '#handle_browser_open ghost timer cancellation' do

@@ -168,8 +168,14 @@ class AudioWebSocketMiddleware
 
   # Forward audio frame to Gemini when ready; suppress while model is speaking to prevent echo loop.
   def forward_audio_frame(data, state, session_id, browser_ws = nil)
+    now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    if (now - (state.last_session_reload_at || 0)) > 2.0
+      state.last_session_reload_at = now
+      state.session&.reload rescue nil
+    end
+
     # Multi-tab zombie teardown: immediately drop frames and close socket if session has ended
-    if state.session&.ended? || (state.session.present? && (state.session.reload.ended? rescue false))
+    if state.session&.ended?
       Rails.logger.warn("[AudioWS] Dropping audio frame for ended session #{session_id} and closing socket")
       if browser_ws
         send_json(browser_ws, type: 'session_ended', reason: state.session&.end_reason || 'session_ended') rescue nil
@@ -221,7 +227,10 @@ class AudioWebSocketMiddleware
       return
     end
 
-    Sessions::StartHandler.new(session).call unless session.active?
+    was_already_active = session.active?
+    state.fresh_start = !was_already_active && session.transcript_turns.none? && !session.gemini_resumption_token.present?
+
+    Sessions::StartHandler.new(session).call unless was_already_active
 
     state.turn_counter = session.transcript_turns.maximum(:turn_number).to_i
 
@@ -444,12 +453,13 @@ class AudioWebSocketMiddleware
         send_json(browser_ws, type: 'speaker_changed', speaker: 'candidate')
       else
         Rails.logger.info("[AudioWS] Gemini ready — sending session_started for session #{session.id}")
-        if session.active? && !state.model_speaking
-          send_json(browser_ws, type: 'speaker_changed', speaker: 'candidate')
-        elsif !session.gemini_resumption_token.present?
+        if state.fresh_start
+          state.fresh_start = false
           state.model_speaking = true
           send_json(browser_ws, type: 'speaker_changed', speaker: 'ai')
-          state.gemini_client.trigger_opening
+          state.gemini_client&.trigger_opening
+        elsif session.active? && !state.model_speaking
+          send_json(browser_ws, type: 'speaker_changed', speaker: 'candidate')
         end
         send_json(browser_ws, type: 'session_started', session_id: session.id)
       end
@@ -932,7 +942,8 @@ class AudioWebSocketMiddleware
                   :graceful_end_timer, :time_ceiling_timer,
                   :coverage_end_timer, :coverage_pending,
                   :last_ai_turn_ends_with_question, :wrap_up_injected,
-                  :waiting_for_candidate_response
+                  :waiting_for_candidate_response, :fresh_start,
+                  :last_session_reload_at
 
     def initialize
       @turn_counter = 0
