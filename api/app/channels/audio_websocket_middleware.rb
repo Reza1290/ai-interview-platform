@@ -332,7 +332,9 @@ class AudioWebSocketMiddleware
         send_json(browser_ws, type: 'speaker_changed', speaker: 'candidate')
       else
         Rails.logger.info("[AudioWS] Gemini ready — sending session_started for session #{session.id}")
-        unless session.gemini_resumption_token.present?
+        if session.active? && !state.model_speaking
+          send_json(browser_ws, type: 'speaker_changed', speaker: 'candidate')
+        elsif !session.gemini_resumption_token.present?
           state.model_speaking = true
           send_json(browser_ws, type: 'speaker_changed', speaker: 'ai')
           state.gemini_client.trigger_opening
