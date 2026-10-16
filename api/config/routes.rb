@@ -33,8 +33,9 @@ Rails.application.routes.draw do
       end
 
       # Candidate-facing (no JWT — invite token only)
-      get  'sessions/:token/candidate',      to: 'sessions#candidate_info'
-      post 'sessions/:token/audio_complete', to: 'sessions#audio_complete'
+      get   'sessions/:token/candidate',      to: 'sessions#candidate_info'
+      patch 'sessions/:token/candidate',      to: 'sessions#update_candidate'
+      post  'sessions/:token/audio_complete', to: 'sessions#audio_complete'
 
       # Portfolio skills overrides
       resources :portfolio_skills, only: [] do

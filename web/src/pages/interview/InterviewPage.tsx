@@ -38,6 +38,10 @@ export default function InterviewPage() {
   const connectionLostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [micMuted, setMicMuted] = useState(false);
   const micMutedRef = useRef(false);
+  const [consentAgreed, setConsentAgreed] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
 
   // Fetch candidate info
   useEffect(() => {
@@ -46,10 +50,38 @@ export default function InterviewPage() {
       .then((res) => {
         setCandidateInfo(res.data);
         setSessionId(res.data.session_id);
+        if (res.data.consent_given) setConsentAgreed(true);
+        if (res.data.candidate_name) setEditedName(res.data.candidate_name);
         if (res.data.session_status === "ended") setInterviewState("complete");
       })
       .catch(() => setInterviewState("complete"));
   }, [token]);
+
+  const handleUpdateName = async () => {
+    if (!token || !editedName.trim()) return;
+    try {
+      setIsUpdatingName(true);
+      await sessionsApi.updateCandidate(token, { candidate_name: editedName.trim() });
+      setCandidateInfo((prev) => (prev ? { ...prev, candidate_name: editedName.trim() } : prev));
+      setIsEditingName(false);
+    } catch {
+      // Retain previous state on error
+    } finally {
+      setIsUpdatingName(false);
+    }
+  };
+
+  const handleConsentToggle = async (checked: boolean) => {
+    setConsentAgreed(checked);
+    if (token && checked) {
+      try {
+        await sessionsApi.updateCandidate(token, { consent_given: true });
+        setCandidateInfo((prev) => (prev ? { ...prev, consent_given: true } : prev));
+      } catch {
+        // Retain optimistic state to avoid blocking candidate on transient network issues
+      }
+    }
+  };
 
   const muteRef = useRef<(() => void) | null>(null);
   const unmuteRef = useRef<(() => void) | null>(null);
@@ -160,7 +192,7 @@ export default function InterviewPage() {
   }, [mute, unmute]);
 
   const startInterview = useCallback(async () => {
-    if (!sessionId) return;
+    if (!sessionId || !consentAgreed) return;
     setInterviewState("connecting");
     connect();
     await startCapture();
@@ -168,7 +200,7 @@ export default function InterviewPage() {
     // This prevents mic audio from being sent during AI speech, since separate
     // AudioContexts for capture/playback break the browser's echo cancellation.
     muteRef.current?.();
-  }, [sessionId, connect, startCapture]);
+  }, [sessionId, consentAgreed, connect, startCapture]);
 
   const endInterview = useCallback(async () => {
     setInterviewState("ending");
@@ -187,7 +219,7 @@ export default function InterviewPage() {
       ? "connected"
       : "reconnecting";
 
-  // ── State A: Pre-start ──────────────────────────────────────────────────
+  // Pre-start state
   if (interviewState === "idle") {
     return (
       <div className="max-w-xl mx-auto px-4 py-8 space-y-6">
@@ -200,6 +232,87 @@ export default function InterviewPage() {
           )}
         </div>
 
+        {/* Candidate Identity Card */}
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Data Kandidat
+            </span>
+            {!isEditingName && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-primary"
+                onClick={() => {
+                  setEditedName(candidateInfo?.candidate_name || "");
+                  setIsEditingName(true);
+                }}
+              >
+                Koreksi Nama
+              </Button>
+            )}
+          </div>
+
+          {isEditingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                placeholder="Masukkan nama lengkap"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                disabled={isUpdatingName}
+              />
+              <Button
+                size="sm"
+                className="h-9"
+                onClick={handleUpdateName}
+                disabled={isUpdatingName || !editedName.trim()}
+              >
+                Simpan
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => setIsEditingName(false)}
+                disabled={isUpdatingName}
+              >
+                Batal
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm font-medium text-foreground">
+              Selamat datang,{" "}
+              <span className="font-semibold text-primary">
+                {candidateInfo?.candidate_name || "Kandidat"}
+              </span>
+            </p>
+          )}
+        </div>
+
+        {/* UU PDP Consent Gate */}
+        <div className="rounded-lg border bg-card p-4 space-y-2">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              id="consent-checkbox"
+              checked={consentAgreed}
+              onChange={(e) => handleConsentToggle(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">
+                Persetujuan Pemrosesan Data Pribadi & Rekaman Audio
+              </p>
+              <p>
+                Saya menyetujui pemrosesan data pribadi dan perekaman audio selama wawancara berlangsung
+                untuk keperluan evaluasi kompetensi sesuai ketentuan UU Pelindungan Data Pribadi (UU PDP No. 27/2022).
+              </p>
+            </div>
+          </label>
+        </div>
+
         {!hardwareCheckDone ? (
           <div className="space-y-4">
             <div className="bg-muted/50 rounded-lg p-4 text-sm space-y-1.5 text-muted-foreground">
@@ -208,7 +321,13 @@ export default function InterviewPage() {
               <p>• The session will last up to {candidateInfo?.time_limit_min ?? "—"} minutes.</p>
               <p>• Your mic will be active throughout. You can end anytime.</p>
             </div>
-            <HardwareCheck onStart={() => { setHardwareCheckDone(true); startInterview(); }} />
+            <HardwareCheck
+              consentAgreed={consentAgreed}
+              onStart={() => {
+                setHardwareCheckDone(true);
+                startInterview();
+              }}
+            />
           </div>
         ) : (
           <div className="space-y-4">
@@ -216,7 +335,12 @@ export default function InterviewPage() {
               <CheckCircle className="h-4 w-4 shrink-0" />
               <span>Hardware checks passed. You're ready to start.</span>
             </div>
-            <Button className="w-full" size="lg" onClick={startInterview}>
+            <Button
+              className="w-full"
+              size="lg"
+              disabled={!consentAgreed}
+              onClick={startInterview}
+            >
               <Mic className="h-4 w-4 mr-2" />
               Start Interview
             </Button>

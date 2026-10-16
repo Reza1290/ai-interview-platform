@@ -161,6 +161,8 @@ export interface SkillTaxonomy {
 
 export interface CandidateInfo {
   session_id: number;
+  candidate_name?: string;
+  consent_given?: boolean;
   role_title: string;
   time_limit_min: number;
   session_status: string;
