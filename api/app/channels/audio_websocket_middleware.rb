@@ -21,9 +21,60 @@ class AudioWebSocketMiddleware
                    ' Two sentences total, then stop.'
 
   @@active_states = {}
+  @@active_connections = Hash.new { |h, k| h[k] = [] }
 
   def self.active_states
     @@active_states
+  end
+
+  def self.active_connections
+    @@active_connections
+  end
+
+  def self.terminate_session_connections(session_id, reason: 'manual_assessor')
+    key = session_id.to_s
+    active_state = @@active_states.delete(key)
+    if active_state
+      active_state.proactive_reconnect_timer&.cancel
+      active_state.graceful_end_timer&.cancel
+      active_state.time_ceiling_timer&.cancel
+      active_state.coverage_end_timer&.cancel
+      begin
+        active_state.gemini_client&.close
+      rescue StandardError => e
+        Rails.logger.warn("[AudioWS] Failed to close active gemini client: #{e.message}")
+      end
+    end
+
+    conns = @@active_connections.delete(key) || []
+    conns.each do |conn|
+      ws = conn[:ws]
+      st = conn[:state]
+      if st && st != active_state
+        st.proactive_reconnect_timer&.cancel
+        st.graceful_end_timer&.cancel
+        st.time_ceiling_timer&.cancel
+        st.coverage_end_timer&.cancel
+        begin
+          st.gemini_client&.close
+        rescue StandardError => e
+          Rails.logger.warn("[AudioWS] Failed to close secondary gemini client: #{e.message}")
+        end
+      end
+
+      if ws
+        begin
+          ws.send({ type: 'session_ended', reason: reason }.to_json)
+          if Rails.env.test?
+            ws.close rescue nil
+          else
+            EM.add_timer(0.3) { ws.close rescue nil }
+          end
+        rescue StandardError => e
+          Rails.logger.warn("[AudioWS] Failed to close browser ws: #{e.message}")
+        end
+      end
+    end
   end
 
   def initialize(app)
@@ -71,6 +122,7 @@ class AudioWebSocketMiddleware
       end
     end
     @@active_states[session_id.to_s] = state
+    @@active_connections[session_id.to_s] << { ws: browser_ws, state: state }
 
     state.session = session
     connect_to_gemini(browser_ws, state)
@@ -111,6 +163,7 @@ class AudioWebSocketMiddleware
     Rails.logger.info("[AudioWS] Browser disconnected: session=#{session_id} code=#{event.code}")
     state.browser_disconnected_at = Time.current
     state.proactive_reconnect_timer&.cancel
+    @@active_connections[session_id.to_s]&.reject! { |conn| conn[:ws] == browser_ws }
 
     # Keep Gemini alive during grace period in case candidate reconnects via page refresh.
     schedule_graceful_end(browser_ws, state)
