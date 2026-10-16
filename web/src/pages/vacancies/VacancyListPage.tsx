@@ -1,24 +1,33 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/pagination";
 import { vacanciesApi } from "@/services/vacancies";
 import { Plus, Briefcase, ChevronRight } from "lucide-react";
-import type { Vacancy } from "@/types";
+import type { Vacancy, PaginationMeta } from "@/types";
 
 export default function VacancyListPage() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
 
   useEffect(() => {
-    vacanciesApi.list()
-      .then((res) => setVacancies(res.data.vacancies))
+    setLoading(true);
+    vacanciesApi
+      .list(currentPage)
+      .then((res) => {
+        setVacancies(res.data.vacancies);
+        setMeta(res.data.meta);
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }, [currentPage]);
 
   return (
     <div className="space-y-4">
@@ -64,6 +73,14 @@ export default function VacancyListPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {meta && meta.total_pages > 1 && (
+        <Pagination
+          currentPage={meta.current_page}
+          totalPages={meta.total_pages}
+          onPageChange={(page) => setSearchParams({ page: String(page) })}
+        />
       )}
     </div>
   );
