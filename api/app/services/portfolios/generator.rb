@@ -154,26 +154,34 @@ module Portfolios
       portfolio.portfolio_skills.destroy_all
 
       (data['configured_skills'] || []).each do |skill_data|
+        raw_level = skill_data['level']
+        level = raw_level.present? ? raw_level.to_i.clamp(1, 5) : nil
+        summary = skill_data['competency_summary'].presence || (level.nil? ? 'Skill not assessed during interview.' : '')
+
         portfolio.portfolio_skills.create!(
           skill_id:           skill_data['skill_id'],
           skill_label:        skill_data['skill_label'],
           is_discovered:      false,
-          ai_level:           skill_data['level'].to_i.clamp(1, 5),
-          ai_confidence:      skill_data['confidence'],
+          ai_level:           level,
+          ai_confidence:      skill_data['confidence'].presence,
           evidence:           Array(skill_data['evidence']).first(3),
-          competency_summary: skill_data['competency_summary']
+          competency_summary: summary
         )
       end
 
       (data['discovered_skills'] || []).each do |skill_data|
+        raw_level = skill_data['level']
+        level = raw_level.present? ? raw_level.to_i.clamp(1, 5) : nil
+        summary = skill_data['competency_summary'].presence || (level.nil? ? 'Skill not assessed during interview.' : '')
+
         portfolio.portfolio_skills.create!(
           skill_id:           nil,
           skill_label:        skill_data['skill_label'],
           is_discovered:      true,
-          ai_level:           skill_data['level'].to_i.clamp(1, 5),
-          ai_confidence:      skill_data['confidence'],
+          ai_level:           level,
+          ai_confidence:      skill_data['confidence'].presence,
           evidence:           Array(skill_data['evidence']).first(3),
-          competency_summary: skill_data['competency_summary']
+          competency_summary: summary
         )
       end
     end
