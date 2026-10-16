@@ -39,7 +39,7 @@ export default function AssessmentEditPage() {
   const [deletedSkillIds, setDeletedSkillIds] = useState<number[]>([]);
 
   const form = useForm<AssessmentFormValues>({
-    defaultValues: { name: "", time_limit_min: 45, skills: [] },
+    defaultValues: { name: "", time_limit_min: 45, language: "en", skills: [] },
   });
 
   const { register, handleSubmit, control, setValue, reset, formState: { errors } } = form;
@@ -58,7 +58,12 @@ export default function AssessmentEditPage() {
       .get(Number(id))
       .then((res) => {
         const a = res.data.assessment;
-        reset({ name: a.name, time_limit_min: a.time_limit_min, skills: a.skills });
+        reset({
+          name: a.name,
+          time_limit_min: a.time_limit_min,
+          language: (a.language as "en" | "id") || "en",
+          skills: a.skills,
+        });
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -89,6 +94,7 @@ export default function AssessmentEditPage() {
       await assessmentsApi.update(Number(id), {
         name: data.name,
         time_limit_min: data.time_limit_min,
+        language: data.language,
         assessment_skills_attributes: [...activeSkills, ...destroyedSkills],
       });
       navigate(`/assessments/${id}/invite`);
@@ -138,6 +144,22 @@ export default function AssessmentEditPage() {
               {TIME_LIMIT_OPTIONS.map((min) => (
                 <SelectItem key={min} value={String(min)}>{min} min</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Interview language</Label>
+          <Select
+            value={form.watch("language")}
+            onValueChange={(v) => setValue("language", v as "en" | "id")}
+          >
+            <SelectTrigger className="w-40" data-testid="select-language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="id">Indonesian</SelectItem>
             </SelectContent>
           </Select>
         </div>
