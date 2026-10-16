@@ -401,9 +401,8 @@ export default function InterviewPage() {
   const candidateSpeaking = speaker === "candidate";
 
   return (
-    <div className="max-w-xl mx-auto px-4 flex flex-col h-full">
-      {/* Top bar */}
-      <div className="flex items-center justify-between py-3 border-b sticky top-12 bg-white z-10">
+    <div className="max-w-xl mx-auto px-4 flex flex-col h-full w-full overflow-hidden">
+      <div className="flex items-center justify-between py-3 border-b bg-white shrink-0 z-10">
         <span className="text-sm font-medium">AI Interview</span>
         {candidateInfo && (
           <InterviewTimer
@@ -414,31 +413,28 @@ export default function InterviewPage() {
         )}
       </div>
 
-      {/* Reconnecting banner */}
       {interviewState === "reconnecting" && (
         connectionLostLong ? (
-          <div className="flex items-center gap-2 text-sm bg-red-50 border border-red-200 text-red-800 rounded-lg px-4 py-2.5 mt-2">
+          <div className="flex items-center gap-2 text-sm bg-red-50 border border-red-200 text-red-800 rounded-lg px-4 py-2.5 mt-2 shrink-0">
             <span className="animate-pulse">●</span>
             <span>Connection is taking too long to restore. Please wait, and contact the interviewer if this persists.</span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-sm bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg px-4 py-2.5 mt-2">
+          <div className="flex items-center gap-2 text-sm bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg px-4 py-2.5 mt-2 shrink-0">
             <span className="animate-pulse">●</span>
             <span>Briefly reconnecting — please wait a moment.</span>
           </div>
         )
       )}
 
-      {/* Reconnected prompt */}
       {reconnectedPrompt && (
-        <div className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5 mt-2">
+        <div className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5 mt-2 shrink-0">
           <span>Reconnected — please say <strong>"check"</strong> or continue your answer to resume.</span>
           <button className="ml-3 text-blue-500 hover:text-blue-700 shrink-0" onClick={() => setReconnectedPrompt(false)}>✕</button>
         </div>
       )}
 
-      {/* Voice indicator */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 py-8">
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 py-4 overflow-hidden">
         {interviewState === "connecting" ? (
           <div className="text-sm text-muted-foreground animate-pulse">Connecting...</div>
         ) : interviewState === "draining_audio" ? (
@@ -448,23 +444,24 @@ export default function InterviewPage() {
           </div>
         ) : (
           <>
-            <VoiceBars
-              active={aiSpeaking}
-              label={aiSpeaking ? "AI speaking" : "Listening..."}
-              variant="ai"
-            />
-
-            {candidateSpeaking && (
+            <div className="shrink-0 flex flex-col items-center gap-4">
               <VoiceBars
-                active={true}
-                label="You're speaking"
-                variant="candidate"
+                active={aiSpeaking}
+                label={aiSpeaking ? "AI speaking" : "Listening..."}
+                variant="ai"
               />
-            )}
 
-            {/* Transcript */}
+              {candidateSpeaking && (
+                <VoiceBars
+                  active={true}
+                  label="You're speaking"
+                  variant="candidate"
+                />
+              )}
+            </div>
+
             {transcript.length > 0 && (
-              <div className="w-full space-y-2 overflow-y-auto max-h-[60vh]">
+              <div className="w-full flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
                 {transcript.map((turn, i) => (
                   <TranscriptBubble key={i} speaker={turn.speaker} text={turn.text} />
                 ))}
@@ -474,8 +471,7 @@ export default function InterviewPage() {
         )}
       </div>
 
-      {/* Bottom bar */}
-      <div className="border-t py-3 flex items-center justify-between gap-4 sticky bottom-0 bg-white">
+      <div className="border-t py-3 flex items-center justify-between gap-4 bg-white shrink-0">
         <ConnectionStatus state={wsConnectionStatus} />
 
         <div className="flex items-center gap-3">
@@ -511,7 +507,7 @@ export default function InterviewPage() {
         {import.meta.env.DEV && (
           <Button variant="outline" size="sm" className="text-xs opacity-50"
             onClick={() => sendJson({ type: "debug_force_reconnect" })}>
-            ⚡ Force reconnect
+            Force reconnect
           </Button>
         )}
         </div>
