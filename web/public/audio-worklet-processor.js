@@ -1,5 +1,5 @@
-const SILENCE_THRESHOLD = 0.01; // RMS below this = silence
-const SILENCE_FRAMES_BEFORE_SKIP = 8; // ~50ms of silence before we stop sending
+const SILENCE_THRESHOLD = 0.002;
+const SILENCE_FRAMES_BEFORE_SKIP = 30;
 
 class PCMProcessor extends AudioWorkletProcessor {
   constructor() {
