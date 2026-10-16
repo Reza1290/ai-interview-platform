@@ -59,7 +59,10 @@ module Api
 
         if format == "pdf"
           vacancy = params[:vacancy_id].present? ? Vacancy.find_by(id: params[:vacancy_id]) : nil
-          pdf_data = Exports::PdfGenerator.new(portfolio: @portfolio, vacancy: vacancy).call
+          cache_key = "pdf_export/portfolio/#{@portfolio.id}-#{@portfolio.generated_at.to_i}-#{vacancy&.id}"
+          pdf_data = Rails.cache.fetch(cache_key, expires_in: 1.hour) do
+            Exports::PdfGenerator.new(portfolio: @portfolio, vacancy: vacancy).call
+          end
 
           return send_data pdf_data,
                            filename:    "portfolio-#{@portfolio.id}.pdf",

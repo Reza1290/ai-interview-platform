@@ -84,4 +84,52 @@ RSpec.describe 'Api::V1::Portfolios', type: :request do
       expect(response).to have_http_status(:not_found)
     end
   end
+
+  describe 'PDF caching and rate limiting (EXP-03)' do
+    before do
+      Rails.cache.clear
+    end
+
+    it 'caches rendered PDF bytes on subsequent export requests' do
+      memory_store = ActiveSupport::Cache.lookup_store(:memory_store)
+      allow(Rails).to receive(:cache).and_return(memory_store)
+
+      pdf_generator_double = instance_double(Exports::PdfGenerator, call: '%PDF-1.4 dummy')
+      allow(Exports::PdfGenerator).to receive(:new).and_return(pdf_generator_double)
+
+      get "/api/v1/portfolios/#{portfolio_a.id}/export?format=pdf",
+          headers: { 'Authorization' => "Bearer #{token_a}" }
+
+      expect(response).to have_http_status(:ok)
+      expect(Exports::PdfGenerator).to have_received(:new).once
+
+      get "/api/v1/portfolios/#{portfolio_a.id}/export?format=pdf",
+          headers: { 'Authorization' => "Bearer #{token_a}" }
+
+      expect(response).to have_http_status(:ok)
+      expect(Exports::PdfGenerator).to have_received(:new).once
+    end
+
+    it 'throttles export requests exceeding 10 per minute per IP with HTTP 429' do
+      Rack::Attack.enabled = true
+      Rack::Attack.reset!
+
+      pdf_generator_double = instance_double(Exports::PdfGenerator, call: '%PDF-1.4 dummy')
+      allow(Exports::PdfGenerator).to receive(:new).and_return(pdf_generator_double)
+
+      10.times do
+        get "/api/v1/portfolios/#{portfolio_a.id}/export",
+            headers: { 'Authorization' => "Bearer #{token_a}", 'REMOTE_ADDR' => '192.168.1.100' }
+      end
+
+      get "/api/v1/portfolios/#{portfolio_a.id}/export",
+          headers: { 'Authorization' => "Bearer #{token_a}", 'REMOTE_ADDR' => '192.168.1.100' }
+
+      expect(response).to have_http_status(:too_many_requests)
+      json = JSON.parse(response.body)
+      expect(json['error']).to match(/Too many requests/i)
+    ensure
+      Rack::Attack.enabled = false
+    end
+  end
 end
