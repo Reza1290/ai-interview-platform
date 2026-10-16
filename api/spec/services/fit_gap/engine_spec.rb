@@ -117,5 +117,25 @@ RSpec.describe FitGap::Engine do
       expect(discovered[:skill_label]).to eq('Kafka Streaming')
       expect(discovered[:candidate_level]).to eq(4)
     end
+
+    it 'includes unassessed skills count in fallback narrative when Gemini generation fails' do
+      vacancy.vacancy_skills.create!(skill_label: 'PostgreSQL', expected_level: 3)
+      vacancy.vacancy_skills.create!(skill_label: 'Redis', expected_level: 3)
+
+      portfolio.portfolio_skills.create!(
+        skill_label: 'PostgreSQL',
+        ai_level: 3,
+        ai_confidence: 'high',
+        competency_summary: 'Match'
+      )
+
+      allow(mock_gemini_client).to receive(:generate_content).and_raise(StandardError.new('Gemini timeout'))
+
+      engine = described_class.new(portfolio: portfolio, vacancy: vacancy, gemini_client: mock_gemini_client)
+      report = engine.call
+
+      expect(report.culture_narrative).to be_nil
+      expect(report.overall_narrative).to include('1 skill was not assessed during this session and require follow-up evaluation.')
+    end
   end
 end
