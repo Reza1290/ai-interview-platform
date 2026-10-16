@@ -20,6 +20,12 @@ class AudioWebSocketMiddleware
                    ' Acknowledge their last answer in one sentence, then say goodbye in one sentence.' \
                    ' Two sentences total, then stop.'
 
+  @@active_states = {}
+
+  def self.active_states
+    @@active_states
+  end
+
   def initialize(app)
     @app = app
   end
@@ -54,6 +60,17 @@ class AudioWebSocketMiddleware
       browser_ws.close
       return
     end
+
+    # Cancel previous disconnect grace period timer if candidate reconnects
+    existing_state = @@active_states[session_id.to_s]
+    if existing_state
+      existing_state.graceful_end_timer&.cancel
+      existing_state.graceful_end_timer = nil
+      if existing_state.gemini_client && existing_state != state
+        existing_state.gemini_client.close
+      end
+    end
+    @@active_states[session_id.to_s] = state
 
     state.session = session
     connect_to_gemini(browser_ws, state)
@@ -503,14 +520,17 @@ class AudioWebSocketMiddleware
   def schedule_graceful_end(browser_ws, state)
     return unless state.session
 
+    session_id_str = state.session.id.to_s
     state.graceful_end_timer = EM::Timer.new(BROWSER_GRACE_PERIOD) do
       Thread.new do
         ActiveRecord::Base.connection_pool.with_connection do
+          next if @@active_states[session_id_str] != state
           next if state.session.reload.ended?
 
           Rails.logger.info("[AudioWS] Grace period expired — ending session #{state.session.id}")
           Sessions::EndHandler.new(state.session).call(reason: 'error')
           EM.schedule { state.gemini_client&.close }
+          @@active_states.delete(session_id_str)
         end
       rescue StandardError => e
         Rails.logger.error("[AudioWS] Thread crashed (graceful end): #{e.class}: #{e.message}")
