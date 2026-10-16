@@ -45,4 +45,24 @@ RSpec.describe Exports::PdfGenerator do
       }.not_to raise_error
     end
   end
+
+  describe 'explicit Not Assessed label (EXP-02)' do
+    it 'renders Level: Not Assessed when skill effective level is nil' do
+      unassessed_skill = PortfolioSkill.create!(
+        portfolio: portfolio,
+        skill_label: 'Cloud Infrastructure & Kubernetes',
+        ai_level: nil,
+        ai_confidence: nil,
+        competency_summary: nil,
+        evidence: []
+      )
+
+      pdf_doc = double('Prawn::Document').as_null_object
+      allow(pdf_doc).to receive(:font_size).and_yield
+
+      expect(pdf_doc).to receive(:text).with(include('Level: Not Assessed'))
+
+      described_class.new(portfolio: portfolio).send(:render_skill_card, pdf_doc, unassessed_skill)
+    end
+  end
 end
