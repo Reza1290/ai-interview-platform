@@ -16,7 +16,8 @@ module FitGap
     # Returns the FitGapReport record.
     def call
       skill_comparisons = build_skill_comparisons
-      narratives        = generate_narratives(skill_comparisons)
+      discovered_skills = effective_portfolio_skills.select { |s| s[:is_discovered] }
+      narratives        = generate_narratives(skill_comparisons, discovered_skills)
 
       report = FitGapReport.find_or_initialize_by(
         portfolio_id: @portfolio.id,
@@ -70,12 +71,13 @@ module FitGap
 
     # Returns portfolio skills with overrides applied.
     def effective_portfolio_skills
-      @portfolio.portfolio_skills.includes(:assessor_override).map do |skill|
+      @effective_portfolio_skills ||= @portfolio.portfolio_skills.includes(:assessor_override).map do |skill|
         override = skill.assessor_override
         {
           id:              skill.id,
           skill_id:        skill.skill_id,
           skill_label:     skill.skill_label,
+          is_discovered:   skill.is_discovered,
           ai_level:        skill.ai_level,
           effective_level: override ? override.override_level : skill.ai_level,
           confidence:      skill.ai_confidence,
@@ -89,13 +91,13 @@ module FitGap
         portfolio_skills.find { |s| s[:skill_label].downcase == label.downcase }
     end
 
-    def generate_narratives(skill_comparisons)
-      gaps    = skill_comparisons.select { |c| c[:result] == 'gap' }
-      matches = skill_comparisons.select { |c| c[:result] == 'match' }
-      exceeds = skill_comparisons.select { |c| c[:result] == 'exceed' }
+    def generate_narratives(skill_comparisons, discovered_skills = [])
+      gaps         = skill_comparisons.select { |c| c[:result] == 'gap' }
+      matches      = skill_comparisons.select { |c| c[:result] == 'match' }
+      exceeds      = skill_comparisons.select { |c| c[:result] == 'exceed' }
       not_assessed = skill_comparisons.select { |c| c[:result] == 'not_assessed' }
 
-      prompt = build_narrative_prompt(gaps, matches, exceeds, not_assessed)
+      prompt = build_narrative_prompt(gaps, matches, exceeds, not_assessed, discovered_skills)
 
       begin
         response = @gemini_client.generate_content(prompt, temperature: 0.4)
@@ -107,10 +109,19 @@ module FitGap
       end
     end
 
-    def build_narrative_prompt(gaps, matches, exceeds, not_assessed)
+    def build_narrative_prompt(gaps, matches, exceeds, not_assessed, discovered_skills = [])
       vacancy = @vacancy
       portfolio_session = @portfolio.session
       assessment = portfolio_session.assessment
+
+      discovered_text = if discovered_skills.any?
+        formatted = discovered_skills.map do |s|
+          "#{s[:skill_label]} (L#{s[:effective_level] || 'unassessed'})"
+        end.join(', ')
+        "- Discovered candidate strengths (#{discovered_skills.count}): #{formatted}"
+      else
+        "- Discovered candidate strengths: None"
+      end
 
       <<~PROMPT
         You are writing a fit/gap analysis narrative for a candidate evaluation.
@@ -124,10 +135,11 @@ module FitGap
         - Gaps (#{gaps.count}): #{gaps.map { |c| "#{c[:skill_label]}: candidate L#{c[:candidate_level]} vs expected L#{c[:expected_level]} (delta #{c[:delta]})" }.join(', ')}
         - Exceeds (#{exceeds.count}): #{exceeds.map { |c| "#{c[:skill_label]}: candidate L#{c[:candidate_level]} vs expected L#{c[:expected_level]} (+#{c[:delta]})" }.join(', ')}
         - Not assessed (#{not_assessed.count}): #{not_assessed.map { |c| c[:skill_label] }.join(', ')}
+        #{discovered_text}
 
         Write two short narrative paragraphs:
-        1. culture_narrative: 2-3 sentences on culture/competency fit based on the comparison patterns.
-        2. overall_narrative: 2-3 sentence overall hiring recommendation summary.
+        1. culture_narrative: 2-3 sentences on culture/competency fit based on the comparison patterns and discovered strengths.
+        2. overall_narrative: 2-3 sentence overall hiring recommendation summary including bonus competencies.
 
         OUTPUT (JSON only):
         {
