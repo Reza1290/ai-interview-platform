@@ -66,7 +66,7 @@ module Exports
       pdf.font_size(10) do
         pdf.text "Session: #{@session.id}"
         pdf.text "Duration: #{format_duration(@session.duration_seconds)}"
-        pdf.text "Generated: #{Time.current.strftime('%Y-%m-%d %H:%M')}"
+        pdf.text "Generated: #{Time.current.strftime('%Y-%m-%d %H:%M %Z')}"
       end
 
       pdf.stroke_horizontal_rule
