@@ -36,6 +36,7 @@ export default function AssessmentEditPage() {
   const [submitting, setSubmitting] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletedSkillIds, setDeletedSkillIds] = useState<number[]>([]);
 
   const form = useForm<AssessmentFormValues>({
     defaultValues: { name: "", time_limit_min: 45, skills: [] },
@@ -43,6 +44,14 @@ export default function AssessmentEditPage() {
 
   const { register, handleSubmit, control, setValue, reset, formState: { errors } } = form;
   const { fields, append, remove, move } = useFieldArray({ control, name: "skills" });
+
+  const handleRemoveSkill = (index: number) => {
+    const skill = form.getValues().skills[index];
+    if (skill?.id) {
+      setDeletedSkillIds((prev) => [...prev, skill.id!]);
+    }
+    remove(index);
+  };
 
   useEffect(() => {
     assessmentsApi
@@ -74,10 +83,13 @@ export default function AssessmentEditPage() {
     setError(null);
     setSubmitting(true);
     try {
+      const activeSkills = data.skills.map((s, i) => ({ ...s, display_order: i }));
+      const destroyedSkills = deletedSkillIds.map((skillId) => ({ id: skillId, _destroy: true }));
+
       await assessmentsApi.update(Number(id), {
         name: data.name,
         time_limit_min: data.time_limit_min,
-        assessment_skills_attributes: data.skills.map((s, i) => ({ ...s, display_order: i })),
+        assessment_skills_attributes: [...activeSkills, ...destroyedSkills],
       });
       navigate(`/assessments/${id}/invite`);
     } catch (e: any) {
@@ -143,7 +155,7 @@ export default function AssessmentEditPage() {
               <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
                   {fields.map((field, index) => (
-                    <SkillCard key={field.id} id={field.id} index={index} form={form} onRemove={() => remove(index)} />
+                    <SkillCard key={field.id} id={field.id} index={index} form={form} onRemove={() => handleRemoveSkill(index)} />
                   ))}
                 </div>
               </SortableContext>
