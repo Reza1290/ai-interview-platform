@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { sessionsApi } from "@/services/sessions";
 import { ArrowLeft, Download } from "lucide-react";
+import { formatTime } from "@/utils/dateTime";
 import type { TranscriptTurn } from "@/types";
 
 export default function TranscriptPage() {
@@ -98,13 +99,20 @@ export default function TranscriptPage() {
                     : "bg-background border border-primary/20"
                 }`}
               >
-                <p
-                  className={`text-xs font-semibold mb-1 ${
-                    isAI ? "text-muted-foreground" : "text-primary"
-                  }`}
-                >
-                  {isAI ? "AI Interviewer" : "Candidate"}
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                  <p
+                    className={`text-xs font-semibold ${
+                      isAI ? "text-muted-foreground" : "text-primary"
+                    }`}
+                  >
+                    {isAI ? "AI Interviewer" : "Candidate"}
+                  </p>
+                  {turn.created_at && (
+                    <span className="text-[11px] text-muted-foreground" data-testid="turn-timestamp">
+                      {formatTime(turn.created_at, undefined, true)}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm whitespace-pre-wrap">{turn.text}</p>
               </div>
             );
