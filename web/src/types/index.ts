@@ -136,11 +136,20 @@ export interface SkillComparison {
   is_override?: boolean;
 }
 
+export interface DiscoveredSkill {
+  skill_id?: string | null;
+  skill_label: string;
+  candidate_level?: number | null;
+  confidence?: string | null;
+  competency_summary?: string | null;
+}
+
 export interface FitGapReport {
   id: number;
   portfolio_id: number;
   vacancy_id: number;
   skill_comparisons: SkillComparison[];
+  discovered_skills?: DiscoveredSkill[];
   culture_narrative: string;
   overall_narrative: string;
   generated_at: string;

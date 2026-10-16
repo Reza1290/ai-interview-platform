@@ -85,5 +85,37 @@ RSpec.describe FitGap::Engine do
       expect(k8s['candidate_level']).to be_nil
       expect(k8s['delta']).to be_nil
     end
+
+    it 'ingests discovered skills in narrative prompt and exposes discovered_skills on report' do
+      vacancy.vacancy_skills.create!(skill_label: 'Ruby', expected_level: 3)
+      portfolio.portfolio_skills.create!(
+        skill_label: 'Ruby',
+        ai_level: 3,
+        ai_confidence: 'high',
+        competency_summary: 'Proficient in Ruby'
+      )
+      portfolio.portfolio_skills.create!(
+        skill_label: 'Kafka Streaming',
+        is_discovered: true,
+        ai_level: 4,
+        ai_confidence: 'medium',
+        competency_summary: 'Built production event streaming pipelines'
+      )
+
+      received_prompt = nil
+      allow(mock_gemini_client).to receive(:generate_content) do |prompt, **_kwargs|
+        received_prompt = prompt
+        { 'culture_narrative' => 'Strong fit', 'overall_narrative' => 'Hire' }.to_json
+      end
+
+      engine = described_class.new(portfolio: portfolio, vacancy: vacancy, gemini_client: mock_gemini_client)
+      report = engine.call
+
+      expect(received_prompt).to include('Discovered candidate strengths (1): Kafka Streaming (L4)')
+      expect(report.discovered_skills.count).to eq(1)
+      discovered = report.discovered_skills.first
+      expect(discovered[:skill_label]).to eq('Kafka Streaming')
+      expect(discovered[:candidate_level]).to eq(4)
+    end
   end
 end
