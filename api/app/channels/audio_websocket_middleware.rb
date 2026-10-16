@@ -264,7 +264,7 @@ class AudioWebSocketMiddleware
 
       # Safety net: if AI said closing words, set coverage_pending and schedule a 15s fallback
       # finalizer in case on_model_turn_complete never fires (Gemini sometimes skips turnComplete).
-      if !state.ending_scheduled && ai_closing_detected?(text)
+      if !state.ending_scheduled && ai_closing_detected?(text, state, session)
         unless state.coverage_pending
           Rails.logger.warn("[AudioWS] AI closed without system signal — forcing coverage_pending (session=#{session.id})")
           state.coverage_pending = true
@@ -747,9 +747,25 @@ class AudioWebSocketMiddleware
     'wawancara kita sudah selesai'
   ].freeze
 
-  def ai_closing_detected?(text)
+  def ai_closing_detected?(text, state = nil, session = nil)
+    if state && session
+      return false unless closing_eligible?(state, session)
+    end
+
     downcased = text.downcase
     CLOSING_PHRASES.any? { |phrase| downcased.include?(phrase) }
+  end
+
+  def closing_eligible?(state, session)
+    return true if state.coverage_pending
+
+    if session.started_at && session.assessment&.time_limit_min
+      elapsed = Time.current - session.started_at
+      time_limit_sec = session.assessment.time_limit_min * 60
+      return true if elapsed >= (0.9 * time_limit_sec)
+    end
+
+    false
   end
 
   def authenticate_and_load(env, session_id)

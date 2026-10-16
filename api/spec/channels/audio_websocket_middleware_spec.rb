@@ -80,4 +80,34 @@ RSpec.describe AudioWebSocketMiddleware do
       expect(AudioWebSocketMiddleware.active_states[session.id.to_s]).to eq(new_state)
     end
   end
+
+  describe '#ai_closing_detected?' do
+    let(:polite_text) { "Thank you for your time explaining your architecture, now let's discuss PostgreSQL." }
+    let(:closing_text) { "Thank you for your time today. That concludes our interview, good luck!" }
+
+    it 'does NOT trigger closing on polite phrases during early interview turns' do
+      session.update!(started_at: 2.minutes.ago)
+      state.coverage_pending = false
+
+      detected = middleware.send(:ai_closing_detected?, polite_text, state, session)
+      expect(detected).to be false
+    end
+
+    it 'triggers closing when coverage_pending is true' do
+      session.update!(started_at: 2.minutes.ago)
+      state.coverage_pending = true
+
+      detected = middleware.send(:ai_closing_detected?, closing_text, state, session)
+      expect(detected).to be true
+    end
+
+    it 'triggers closing when >= 90% of time limit has elapsed' do
+      # 30 minute limit: 90% is 27 minutes. Started 28 minutes ago:
+      session.update!(started_at: 28.minutes.ago)
+      state.coverage_pending = false
+
+      detected = middleware.send(:ai_closing_detected?, closing_text, state, session)
+      expect(detected).to be true
+    end
+  end
 end
