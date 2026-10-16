@@ -11,7 +11,8 @@ module Api
 
         return json_error('Invalid email or password', :unauthorized) unless user&.authenticate(params[:password])
 
-        return json_error('Invalid email or password', :unauthorized) unless user.role == 'admin'
+        # Allow both administrators and assessors to authenticate for assessment workflows
+        return json_error('Access restricted to assessors and administrators', :unauthorized) unless AuthorizeApiRequest::ASSESSOR_ROLES.include?(user.role)
 
         scheme = resolve_scheme
         token  = JsonWebToken.encode({ user_id: user.id, role: user.role, scheme: })
