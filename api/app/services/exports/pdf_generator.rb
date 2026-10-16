@@ -27,6 +27,7 @@ module Exports
     # Returns PDF binary string.
     def call
       Prawn::Document.new(page_size: 'A4', margin: [40, 50, 40, 50]) do |pdf|
+        configure_fonts(pdf)
         render_header(pdf)
         render_portfolio_section(pdf)
         render_fit_gap_section(pdf) if @fit_gap
@@ -35,6 +36,26 @@ module Exports
     end
 
     private
+
+    def configure_fonts(pdf)
+      regular_path = Rails.root.join('app/assets/fonts/DejaVuSans.ttf').to_s
+      bold_path = Rails.root.join('app/assets/fonts/DejaVuSans-Bold.ttf').to_s
+
+      unless File.exist?(regular_path)
+        regular_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+        bold_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+      end
+
+      return unless File.exist?(regular_path) && File.exist?(bold_path)
+
+      pdf.font_families.update(
+        'DejaVuSans' => {
+          normal: regular_path,
+          bold:   bold_path
+        }
+      )
+      pdf.font 'DejaVuSans'
+    end
 
     def render_header(pdf)
       pdf.font_size(22) { pdf.text @assessment.name, style: :bold }
