@@ -26,6 +26,11 @@ RSpec.describe AudioWebSocketMiddleware do
   let(:mock_ws) { double('Faye::WebSocket', send: true) }
   let(:state) { AudioWebSocketMiddleware::ConnectionState.new }
 
+  after(:each) do
+    AudioWebSocketMiddleware.active_states.clear
+    AudioWebSocketMiddleware.active_connections.clear
+  end
+
   describe '#build_on_ready' do
     it 'emits speaker_changed: candidate when resuming an already active session' do
       messages = []
@@ -108,6 +113,25 @@ RSpec.describe AudioWebSocketMiddleware do
 
       detected = middleware.send(:ai_closing_detected?, closing_text, state, session)
       expect(detected).to be true
+    end
+  end
+
+  describe '.terminate_session_connections' do
+    it 'closes browser websockets and gemini clients on session termination' do
+      mock_gemini = double('Gemini::LiveClient', close: true)
+      state.gemini_client = mock_gemini
+      mock_browser_ws = double('Faye::WebSocket', send: true, close: true)
+
+      AudioWebSocketMiddleware.active_states[session.id.to_s] = state
+      AudioWebSocketMiddleware.active_connections[session.id.to_s] = [{ ws: mock_browser_ws, state: state }]
+
+      expect(mock_gemini).to receive(:close).once
+      expect(mock_browser_ws).to receive(:send).with(include('session_ended'))
+
+      AudioWebSocketMiddleware.terminate_session_connections(session.id, reason: 'manual_assessor')
+
+      expect(AudioWebSocketMiddleware.active_states[session.id.to_s]).to be_nil
+      expect(AudioWebSocketMiddleware.active_connections[session.id.to_s]).to be_empty
     end
   end
 end
