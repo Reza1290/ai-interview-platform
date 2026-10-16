@@ -133,14 +133,25 @@ class AudioWebSocketMiddleware
 
   def handle_browser_frame(event, browser_ws, state, session_id)
     if event.data.is_a?(String) && !event.data.start_with?('{')
-      forward_audio_frame(event.data, state, session_id)
+      forward_audio_frame(event.data, state, session_id, browser_ws)
     else
       handle_browser_message(event.data, browser_ws, state)
     end
   end
 
   # Forward audio frame to Gemini when ready; suppress while model is speaking to prevent echo loop.
-  def forward_audio_frame(data, state, session_id)
+  def forward_audio_frame(data, state, session_id, browser_ws = nil)
+    # Multi-tab zombie teardown: immediately drop frames and close socket if session has ended
+    if state.session&.ended? || (state.session.present? && (state.session.reload.ended? rescue false))
+      Rails.logger.warn("[AudioWS] Dropping audio frame for ended session #{session_id} and closing socket")
+      if browser_ws
+        send_json(browser_ws, type: 'session_ended', reason: state.session&.end_reason || 'session_ended') rescue nil
+        browser_ws.close rescue nil
+      end
+      state.gemini_client&.close rescue nil
+      return
+    end
+
     if state.model_speaking
       # Server-side audio gate: suppress mic while model is speaking to prevent speaker echo loop.
       unless state.logged_gate_suppressed
@@ -244,6 +255,7 @@ class AudioWebSocketMiddleware
   def build_on_input_transcription(browser_ws, state, session)
     lambda { |text|
       next unless text.present?
+      next if session&.ended? || (session.present? && (session.reload.ended? rescue false))
 
       turn_number = state.increment_turn!
 
@@ -295,6 +307,7 @@ class AudioWebSocketMiddleware
   def build_on_output_transcription(browser_ws, state, session)
     lambda { |text|
       next unless text.present?
+      next if session&.ended? || (session.present? && (session.reload.ended? rescue false))
 
       text = sanitize_output_transcription(text)
       next unless text.present?
