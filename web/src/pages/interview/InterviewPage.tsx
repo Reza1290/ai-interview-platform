@@ -52,9 +52,16 @@ export default function InterviewPage() {
         setSessionId(res.data.session_id);
         if (res.data.consent_given) setConsentAgreed(true);
         if (res.data.candidate_name) setEditedName(res.data.candidate_name);
-        if (res.data.session_status === "ended") setInterviewState("complete");
+        if (res.data.session_status === "ended") {
+          const validEndReasons = ["manual_candidate", "manual_assessor", "all_covered", "time_ceiling"];
+          if (validEndReasons.includes(res.data.end_reason || "")) {
+            setInterviewState("complete");
+          } else {
+            setInterviewState("error");
+          }
+        }
       })
-      .catch(() => setInterviewState("complete"));
+      .catch(() => setInterviewState("error"));
   }, [token]);
 
   const handleUpdateName = async () => {
@@ -361,6 +368,30 @@ export default function InterviewPage() {
           <br />
           The hiring team will review your results and follow up with you.
         </p>
+      </div>
+    );
+  }
+
+  // ── State G: Error / Connection Interrupted ─────────────────────────────
+  if (interviewState === "error") {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
+        <div className="text-4xl">⚠️</div>
+        <h2 className="text-xl font-semibold">Connection Interrupted</h2>
+        <p className="text-sm text-muted-foreground">
+          A network or server error interrupted the interview connection.
+          <br />
+          You can try reconnecting to continue where you left off.
+        </p>
+        <Button
+          onClick={() => {
+            setInterviewState("connecting");
+            connect();
+          }}
+          className="mt-4"
+        >
+          Retry Connection
+        </Button>
       </div>
     );
   }
