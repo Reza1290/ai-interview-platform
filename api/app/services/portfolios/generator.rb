@@ -7,8 +7,10 @@ module Portfolios
   class Generator
     def initialize(session:, gemini_client: nil)
       @session = session
+      tenant = @session.tenant || @session.assessment&.tenant || Organization.find_by(id: @session.tenant_id)
       @gemini_client = gemini_client || Gemini::HttpClient.new(
-        model:   ENV.fetch('GEMINI_PRO_MODEL', 'gemini-2.0-pro-001'),
+        organization: tenant,
+        model: tenant&.gemini_model(:pro) || ENV.fetch('GEMINI_PRO_MODEL', 'gemini-2.0-pro-001'),
         timeout: 180  # up to 3 minutes for large transcripts
       )
     end

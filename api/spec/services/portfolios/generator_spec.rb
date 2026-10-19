@@ -107,4 +107,18 @@ RSpec.describe Portfolios::Generator do
       expect(reloaded_skill.assessor_override.assessor_notes).to include('Candidate demonstrated L4')
     end
   end
+
+  describe 'multi-tenant HttpClient initialization (ENH-CFG-02)' do
+    it 'passes session tenant organization into Gemini::HttpClient' do
+      mock_client = instance_double(Gemini::HttpClient)
+      expect(Gemini::HttpClient).to receive(:new).with(
+        hash_including(
+          organization: organization
+        )
+      ).and_return(mock_client)
+
+      gen = described_class.new(session: session)
+      expect(gen.instance_variable_get(:@gemini_client)).to eq(mock_client)
+    end
+  end
 end

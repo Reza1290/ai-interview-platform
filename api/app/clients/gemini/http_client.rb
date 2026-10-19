@@ -17,9 +17,14 @@ module Gemini
     class RateLimitError < ApiError; end
     class TimeoutError < ApiError; end
 
-    def initialize(model: nil, api_key: nil, timeout: 60)
-      @model = model
-      @api_key = api_key || ENV.fetch('GEMINI_API_KEY')
+    attr_reader :model, :api_key, :timeout
+
+    def initialize(organization: nil, model: nil, api_key: nil, timeout: 60)
+      resolved_org = organization || (defined?(Current) ? Current.tenant : nil)
+      @api_key = api_key || resolved_org&.gemini_api_key || ENV['GEMINI_API_KEY']
+      raise ArgumentError, 'Gemini API key is required' if @api_key.blank?
+
+      @model = model || resolved_org&.gemini_model(:pro) || ENV['GEMINI_PRO_MODEL'].presence || 'gemini-2.0-pro-exp-02-05'
       @timeout = timeout
       @connection = build_connection
     end

@@ -291,4 +291,21 @@ RSpec.describe AudioWebSocketMiddleware do
       expect(session.reload.gemini_resumption_token).to eq(token)
     end
   end
+
+  describe 'multi-tenant dynamic Gemini client factory (ENH-CFG-02)' do
+    it 'passes session tenant organization into Gemini::LiveClient' do
+      state.session = session
+      mock_gemini = instance_double(Gemini::LiveClient)
+
+      expect(Gemini::LiveClient).to receive(:new).with(
+        hash_including(
+          organization: organization,
+          system_prompt: assessment.system_prompt
+        )
+      ).and_return(mock_gemini)
+
+      middleware.send(:build_gemini_client, mock_ws, state)
+      expect(state.gemini_client).to eq(mock_gemini)
+    end
+  end
 end

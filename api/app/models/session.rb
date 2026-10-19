@@ -6,6 +6,7 @@ class Session < ApplicationRecord
   STATUSES   = %w[pending active ended failed].freeze
   END_REASONS = %w[manual_candidate manual_assessor all_covered time_ceiling error].freeze
 
+  belongs_to :tenant, class_name: 'Organization', foreign_key: :tenant_id, optional: true
   belongs_to :assessment
   has_many :transcript_turns, dependent: :destroy
   has_many :coverage_maps, dependent: :destroy

@@ -254,8 +254,10 @@ class AudioWebSocketMiddleware
 
   def build_gemini_client(browser_ws, state)
     session = state.session
+    tenant = session.tenant || session.assessment&.tenant || Organization.find_by(id: session.tenant_id)
 
     state.gemini_client = Gemini::LiveClient.new(
+      organization: tenant,
       system_prompt: session.assessment.system_prompt,
       on_audio: build_on_audio(browser_ws, state),
       on_input_transcription: build_on_input_transcription(browser_ws, state, session),
