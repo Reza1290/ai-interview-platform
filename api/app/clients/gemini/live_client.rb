@@ -18,13 +18,14 @@ module Gemini
     SILENCE_FRAME_SAMPLES = 640
     SILENCE_FRAME = ("\x00" * (SILENCE_FRAME_SAMPLES * 2)).freeze
 
-    attr_reader :resumption_token, :connected, :connected_at, :inactivity_close
+    attr_reader :resumption_token, :connected, :connected_at, :inactivity_close, :api_key, :model, :voice
 
     def initialize(
       system_prompt:,
+      organization: nil,
       api_key: nil,
       model: nil,
-      voice: 'Puck',
+      voice: nil,
       on_audio: nil,
       on_input_transcription: nil,
       on_output_transcription: nil,
@@ -35,10 +36,13 @@ module Gemini
       on_ready: nil,
       on_resumption_token_update: nil
     )
+      resolved_org = organization || (defined?(Current) ? Current.tenant : nil)
       @system_prompt = system_prompt
-      @api_key = api_key || ENV.fetch('GEMINI_API_KEY')
-      @model = model || ENV.fetch('GEMINI_LIVE_MODEL', 'gemini-3.1-flash-live-preview')
-      @voice = voice
+      @api_key = api_key || resolved_org&.gemini_api_key || ENV['GEMINI_API_KEY']
+      raise ArgumentError, 'Gemini API key is required' if @api_key.blank?
+
+      @model = model || resolved_org&.gemini_model(:live) || ENV['GEMINI_LIVE_MODEL'].presence || 'gemini-3.1-flash-live-preview'
+      @voice = voice || resolved_org&.gemini_voice || Organization::DEFAULT_GEMINI_VOICE
       @resumption_token = nil
       @connected = false
       @ws = nil
