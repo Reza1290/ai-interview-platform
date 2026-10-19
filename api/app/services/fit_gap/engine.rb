@@ -7,9 +7,11 @@ module FitGap
     def initialize(portfolio:, vacancy:, gemini_client: nil)
       @portfolio = portfolio
       @vacancy   = vacancy
+      tenant     = @vacancy.tenant || @portfolio.session&.tenant
       @gemini_client = gemini_client || Gemini::HttpClient.new(
-        model:   ENV.fetch('GEMINI_FLASH_MODEL', 'gemini-2.0-flash-001'),
-        timeout: 30
+        organization: tenant,
+        model:        tenant&.gemini_model(:flash) || ENV['GEMINI_FLASH_MODEL'].presence || 'gemini-2.0-flash-001',
+        timeout:      30
       )
     end
 
@@ -38,11 +40,10 @@ module FitGap
     private
 
     def build_skill_comparisons
-      vacancy_skills = @vacancy.vacancy_skills.index_by(&:skill_label)
       portfolio_skills = effective_portfolio_skills  # includes overrides
 
-      comparisons = vacancy_skills.map do |label, vacancy_skill|
-        portfolio_skill = find_portfolio_skill(portfolio_skills, label, vacancy_skill.skill_id)
+      @vacancy.vacancy_skills.map do |vacancy_skill|
+        portfolio_skill = find_portfolio_skill(portfolio_skills, vacancy_skill)
 
         candidate_level = portfolio_skill&.dig(:effective_level)
         expected_level  = vacancy_skill.expected_level
@@ -56,17 +57,17 @@ module FitGap
         end
 
         {
-          skill_label:     label,
+          skill_label:     vacancy_skill.skill_label,
           skill_id:        vacancy_skill.skill_id,
+          is_custom:       vacancy_skill.is_custom?,
           candidate_level: candidate_level,
           expected_level:  expected_level,
           result:          result,
           delta:           delta,
-          confidence:      portfolio_skill&.dig(:confidence)
+          confidence:      portfolio_skill&.dig(:confidence),
+          overridden:      portfolio_skill&.dig(:overridden) || false
         }
       end
-
-      comparisons
     end
 
     # Returns portfolio skills with overrides applied.
@@ -86,9 +87,17 @@ module FitGap
       end
     end
 
-    def find_portfolio_skill(portfolio_skills, label, skill_id)
-      portfolio_skills.find { |s| s[:skill_id] == skill_id && skill_id.present? } ||
-        portfolio_skills.find { |s| s[:skill_label].downcase == label.downcase }
+    # Hybrid matching: 1. match by taxonomy skill_id when both present, 2. normalized label fallback.
+    def find_portfolio_skill(portfolio_skills, vacancy_skill)
+      if vacancy_skill.skill_id.present?
+        by_id = portfolio_skills.find { |s| s[:skill_id].present? && s[:skill_id] == vacancy_skill.skill_id }
+        return by_id if by_id
+      end
+
+      normalized = vacancy_skill.skill_label.to_s.strip.downcase
+      portfolio_skills.find do |s|
+        s[:skill_label].to_s.strip.downcase == normalized
+      end
     end
 
     def generate_narratives(skill_comparisons, discovered_skills = [])

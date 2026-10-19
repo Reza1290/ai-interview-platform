@@ -137,5 +137,57 @@ RSpec.describe FitGap::Engine do
       expect(report.culture_narrative).to be_nil
       expect(report.overall_narrative).to include('1 skill was not assessed during this session and require follow-up evaluation.')
     end
+
+    it 'matches custom vacancy skills using normalized label matching with overrides support' do
+      # Custom vacancy skill with irregular casing and leading/trailing whitespace
+      custom_v_skill = vacancy.vacancy_skills.create!(
+        skill_id: nil,
+        skill_label: '  Golang Concurrency  ',
+        expected_level: 3,
+        is_custom: true
+      )
+
+      # Candidate portfolio skill discovered or evaluated with different casing
+      p_skill = portfolio.portfolio_skills.create!(
+        skill_id: nil,
+        skill_label: 'golang concurrency',
+        ai_level: 2,
+        ai_confidence: 'medium',
+        competency_summary: 'Basic goroutines usage',
+        is_discovered: false
+      )
+
+      # Assessor overrides candidate to level 4
+      p_skill.create_assessor_override!(
+        ai_level: 2,
+        override_level: 4,
+        assessor_notes: 'Demonstrated channel synchronization and worker pools',
+        overridden_by: 42
+      )
+
+      engine = described_class.new(portfolio: portfolio, vacancy: vacancy, gemini_client: mock_gemini_client)
+      report = engine.call
+
+      comparison = report.skill_comparisons.find { |c| c['skill_label'] == '  Golang Concurrency  ' }
+      expect(comparison).to be_present
+      expect(comparison['is_custom']).to be true
+      expect(comparison['candidate_level']).to eq(4)
+      expect(comparison['expected_level']).to eq(3)
+      expect(comparison['delta']).to eq(1)
+      expect(comparison['result']).to eq('exceed')
+      expect(comparison['overridden']).to be true
+    end
+
+    it 'injects vacancy organization tenant into Gemini::HttpClient' do
+      mock_client = instance_double(Gemini::HttpClient)
+      expect(Gemini::HttpClient).to receive(:new).with(
+        hash_including(
+          organization: organization
+        )
+      ).and_return(mock_client)
+
+      engine = described_class.new(portfolio: portfolio, vacancy: vacancy)
+      expect(engine.instance_variable_get(:@gemini_client)).to eq(mock_client)
+    end
   end
 end
