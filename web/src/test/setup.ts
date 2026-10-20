@@ -8,4 +8,7 @@ class ResizeObserverMock {
 
 if (typeof window !== "undefined") {
   window.ResizeObserver = window.ResizeObserver || ResizeObserverMock;
+  if (!window.HTMLElement.prototype.scrollIntoView) {
+    window.HTMLElement.prototype.scrollIntoView = () => {};
+  }
 }
