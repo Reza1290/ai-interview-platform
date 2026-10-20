@@ -2,6 +2,7 @@ import { useAtomValue } from "jotai";
 import { tenantAtom } from "@/stores/tenantAtom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import AiSettingsSection from "./AiSettingsSection";
 
 export default function SettingsPage() {
   const tenant = useAtomValue(tenantAtom);
@@ -16,6 +17,8 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-6">
+        <AiSettingsSection />
+
         <Card>
           <CardHeader>
             <CardTitle>Tenant Profile</CardTitle>

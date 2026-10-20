@@ -51,6 +51,10 @@ Rails.application.routes.draw do
       # Vacancies
       resources :vacancies
 
+      # Organization AI settings
+      get   'organization/ai_config', to: 'organizations#show_ai_config'
+      patch 'organization/ai_config', to: 'organizations#update_ai_config'
+
       # Portfolios — fit/gap and export
       resources :portfolios, only: [] do
         member do
