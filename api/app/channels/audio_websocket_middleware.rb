@@ -332,6 +332,21 @@ class AudioWebSocketMiddleware
     Rails.logger.debug("[AudioWS] Coverage injected (digest=#{state.last_coverage_digest&.slice(0, 8)})")
   end
 
+  # Micro-RAG candidate project evidence injection (< 5ms via PostgreSQL pgvector)
+  def maybe_inject_cv_evidence(state, session, query)
+    return unless query.present? && state.gemini_client.present?
+    return if state.cv_probes_injected[query]
+
+    rag = Cv::RetrievalService.call(session: session, query: query)
+    return unless rag.success? && rag.directive.present?
+
+    state.gemini_client.inject_context(rag.directive)
+    state.cv_probes_injected[query] = true
+    Rails.logger.info("[AudioWS] Micro-RAG CV directive injected for '#{query}' (session=#{session.id})")
+  rescue StandardError => e
+    Rails.logger.warn("[AudioWS] Micro-RAG CV injection skipped: #{e.message}")
+  end
+
   # If the AI ended its last turn with a question, piggyback the wrap-up signal on the candidate's
   # next turn so the AI's response to their answer is the closing rather than another question.
   def maybe_piggyback_wrap_up(state, session)
@@ -459,6 +474,7 @@ class AudioWebSocketMiddleware
           state.fresh_start = false
           state.model_speaking = true
           send_json(browser_ws, type: 'speaker_changed', speaker: 'ai')
+          maybe_inject_cv_evidence(state, session, session.assessment&.name)
           state.gemini_client&.trigger_opening
         elsif session.active? && !state.model_speaking
           send_json(browser_ws, type: 'speaker_changed', speaker: 'candidate')
@@ -945,7 +961,7 @@ class AudioWebSocketMiddleware
                   :coverage_end_timer, :coverage_pending,
                   :last_ai_turn_ends_with_question, :wrap_up_injected,
                   :waiting_for_candidate_response, :fresh_start,
-                  :last_session_reload_at
+                  :last_session_reload_at, :cv_probes_injected
 
     def initialize
       @turn_counter = 0
@@ -956,6 +972,7 @@ class AudioWebSocketMiddleware
       @last_ai_turn_ends_with_question = false
       @waiting_for_candidate_response = false
       @sent_time_warnings = Set.new
+      @cv_probes_injected = {}
     end
 
     def increment_turn!
