@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import LevelRadio from "@/components/assessment/LevelRadio";
 import SkillPicker from "@/components/assessment/SkillPicker";
 import { vacanciesApi } from "@/services/vacancies";
@@ -70,37 +71,68 @@ export default function VacancyNewPage() {
 
         {/* Expected skills */}
         <div className="space-y-3">
-          <Label>Expected skills</Label>
+          <Label>Expected skills & competencies</Label>
 
           {fields.length === 0 ? (
             <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
-              No skills added yet.
+              No skills added yet. Add taxonomy skills or custom competencies.
             </div>
           ) : (
             <div className="space-y-2">
-              {fields.map((field, index) => (
-                <div key={field.id} className="border rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{watch(`skills.${index}.skill_label`)}</span>
-                    <button type="button" onClick={() => remove(index)} className="text-muted-foreground hover:text-destructive">
-                      <X className="h-4 w-4" />
-                    </button>
+              {fields.map((field, index) => {
+                const isCustom = watch(`skills.${index}.is_custom`);
+                return (
+                  <div key={field.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      {isCustom ? (
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">Custom</Badge>
+                            <span className="text-xs text-muted-foreground">Custom Competency Requirement</span>
+                          </div>
+                          <Input
+                            placeholder="e.g. Distributed Consensus, Domain-Driven Design"
+                            {...register(`skills.${index}.skill_label`, { required: true })}
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-sm font-medium">{watch(`skills.${index}.skill_label`)}</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="text-muted-foreground hover:text-destructive self-start mt-1"
+                        aria-label="Remove skill"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs text-muted-foreground">Expected level:</span>
+                      <LevelRadio
+                        value={watch(`skills.${index}.expected_level`) ?? 3}
+                        onChange={(v) => setValue(`skills.${index}.expected_level`, v)}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Expected level:</span>
-                    <LevelRadio
-                      value={watch(`skills.${index}.expected_level`) ?? 3}
-                      onChange={(v) => setValue(`skills.${index}.expected_level`, v)}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
-          <Button type="button" variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add skill expectation
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add from Skill Taxonomy
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => append({ is_custom: true, skill_label: "", expected_level: 3, weight: 1.0 })}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Custom Competency
+            </Button>
+          </div>
         </div>
 
         <Separator />
