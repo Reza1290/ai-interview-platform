@@ -219,3 +219,28 @@ export interface WsControlMessage {
   message?: string;
   recoverable?: boolean;
 }
+
+export interface OrganizationAiConfig {
+  custom_ai_configured: boolean;
+  gemini_api_key_configured: boolean;
+  masked_gemini_api_key: string | null;
+  models: {
+    live: string;
+    flash: string;
+    pro: string;
+  };
+  voice: string;
+  temperature: number;
+  allowed_voices: string[];
+}
+
+export interface UpdateAiConfigRequest {
+  gemini_api_key?: string;
+  models?: {
+    live?: string;
+    flash?: string;
+    pro?: string;
+  };
+  voice?: string;
+  temperature?: number;
+}
