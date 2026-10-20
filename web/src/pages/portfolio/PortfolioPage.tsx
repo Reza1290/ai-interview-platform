@@ -186,6 +186,16 @@ export default function PortfolioPage() {
       {/* Ready state */}
       {!generating && portfolio?.generation_status === "complete" && (
         <>
+          {/* Candidate CV Evidence Ingestion Banner */}
+          {portfolio.cv_evidence && portfolio.cv_evidence.length > 0 && (
+            <div className="flex items-center gap-2 p-3 bg-blue-50/60 border border-blue-200/70 rounded-lg text-xs text-blue-900">
+              <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+              <span>
+                <strong>Candidate CV Integrated:</strong> {portfolio.cv_evidence.length} semantic project records cross-referenced against live interview turns.
+              </span>
+            </div>
+          )}
+
           {/* Configured skills */}
           <div className="space-y-3">
             <h2 className="text-sm font-semibold">Configured Skills</h2>

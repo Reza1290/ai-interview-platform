@@ -162,6 +162,17 @@ module Api
       end
 
       def portfolio_json(portfolio)
+        session = portfolio.session
+        cv_chunks = session&.candidate_cv_chunks&.order(:chunk_index)&.map do |c|
+          {
+            id: c.id,
+            chunk_index: c.chunk_index,
+            section_type: c.section_type,
+            content: c.content,
+            metadata: c.metadata || {}
+          }
+        end || []
+
         {
           id:                portfolio.id,
           session_id:        portfolio.session_id,
@@ -170,7 +181,8 @@ module Api
           generated_at:      portfolio.generated_at,
           generation_error:  portfolio.generation_error,
           skills:            portfolio.portfolio_skills.map(&method(:portfolio_skill_json)),
-          overrides:         portfolio.assessor_overrides.map(&method(:override_json))
+          overrides:         portfolio.assessor_overrides.map(&method(:override_json)),
+          cv_evidence:       cv_chunks
         }
       end
 
@@ -183,8 +195,28 @@ module Api
           ai_level:          skill.ai_level,
           ai_confidence:     skill.ai_confidence,
           evidence:          skill.evidence_quotes,
-          competency_summary: skill.competency_summary
+          competency_summary: skill.competency_summary,
+          matching_cv_claims: find_matching_cv_claims(skill)
         }
+      end
+
+      def find_matching_cv_claims(skill)
+        session = skill.portfolio&.session
+        return [] unless session
+
+        keywords = skill.skill_label.to_s.downcase.split(/\W+/).reject { |w| w.length < 3 }
+        return [] if keywords.empty?
+
+        session.candidate_cv_chunks.select do |chunk|
+          content_lower = chunk.content.to_s.downcase
+          keywords.any? { |kw| content_lower.include?(kw) }
+        end.map do |chunk|
+          {
+            section_type: chunk.section_type,
+            company: chunk.metadata&.dig('company'),
+            content: chunk.content
+          }
+        end
       end
 
       def override_json(override)

@@ -74,6 +74,20 @@ export interface TranscriptTurn {
   created_at: string;
 }
 
+export interface CvEvidenceChunk {
+  id: number;
+  chunk_index: number;
+  section_type: string;
+  content: string;
+  metadata: Record<string, any>;
+}
+
+export interface MatchingCvClaim {
+  section_type: string;
+  company?: string | null;
+  content: string;
+}
+
 export interface Portfolio {
   id: number;
   session_id: number;
@@ -83,6 +97,7 @@ export interface Portfolio {
   generation_error?: string;
   skills: PortfolioSkill[];
   overrides: AssessorOverride[];
+  cv_evidence?: CvEvidenceChunk[];
 }
 
 export interface PortfolioSkill {
@@ -94,6 +109,7 @@ export interface PortfolioSkill {
   ai_confidence: string;  // "high" | "medium" | "low"
   evidence: string[];
   competency_summary: string;
+  matching_cv_claims?: MatchingCvClaim[];
 }
 
 export interface AssessorOverride {
