@@ -95,7 +95,7 @@ export default function FitGapReportPage() {
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto w-full space-y-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-48 w-full" />
       </div>
@@ -103,18 +103,23 @@ export default function FitGapReportPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto w-full space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" asChild>
             <Link
               to={`/assessments/${id}/sessions/${sessionId}/portfolio`}
-              className="text-muted-foreground hover:text-foreground"
+              title="Back to Portfolio"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <h1 className="text-lg font-semibold">Fit/Gap Report</h1>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Fit/Gap Report</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Comparative analysis between candidate assessed competencies and target vacancy benchmarks.
+            </p>
           </div>
         </div>
 
@@ -156,7 +161,7 @@ export default function FitGapReportPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Skill Comparison</CardTitle>
             </CardHeader>
-            <CardContent className="px-4 pb-4">
+            <CardContent>
               <ComparisonTable comparisons={report.skill_comparisons} />
             </CardContent>
           </Card>
@@ -168,7 +173,7 @@ export default function FitGapReportPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Culture &amp; Competency Fit</CardTitle>
             </CardHeader>
-            <CardContent className="px-4 pb-4">
+            <CardContent>
               <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
                 {report.culture_narrative || report.overall_narrative}
               </p>
@@ -186,7 +191,7 @@ export default function FitGapReportPage() {
                     Discovered Skills (not in vacancy requirements)
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 pb-4 space-y-2">
+                <CardContent className="space-y-2">
                   {portfolio.skills
                     .filter((s) => s.is_discovered)
                     .map((s) => (

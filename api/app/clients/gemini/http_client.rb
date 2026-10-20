@@ -31,8 +31,12 @@ module Gemini
 
     # Generates content using Gemini REST API.
     # Returns parsed JSON response body.
-    def generate_content(prompt, temperature: 0.2)
-      response = @connection.post(generate_url, request_body(prompt, temperature), request_headers)
+    def generate_content(prompt, temperature: 0.2, response_mime_type: 'application/json', max_output_tokens: 8192)
+      response = @connection.post(
+        generate_url,
+        request_body(prompt, temperature, response_mime_type: response_mime_type, max_output_tokens: max_output_tokens),
+        request_headers
+      )
       parse_response(response)
     rescue Faraday::TimeoutError => e
       raise TimeoutError.new("Gemini API timeout after #{@timeout}s: #{e.message}")
@@ -50,25 +54,30 @@ module Gemini
       { 'Content-Type' => 'application/json', 'x-goog-api-key' => @api_key }
     end
 
-    def request_body(prompt, temperature)
+    def request_body(prompt, temperature, response_mime_type: nil, max_output_tokens: nil)
+      config = { temperature: temperature }
+      config[:responseMimeType] = response_mime_type if response_mime_type.present?
+      config[:maxOutputTokens] = max_output_tokens if max_output_tokens.present?
+
       {
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: temperature }
+        generationConfig: config
       }.to_json
     end
 
     def build_connection
       Faraday.new do |f|
         f.request :retry, {
-          max: 3,
-          interval: 1,
+          max: 4,
+          interval: 2,
           interval_randomness: 0.5,
           backoff_factor: 2,
           retry_statuses: [429, 500, 502, 503],
+          methods: %i[delete get head options put trace post],
           retry_block: ->(env, _opts, retries, exc) {
             retry_after = env&.response_headers&.[]('retry-after')&.to_i
-            sleep([retry_after || 1, 30].min) if env&.status == 429
-            Rails.logger.warn("[Gemini::HttpClient] Retry ##{retries} for #{@model}: #{exc&.message}")
+            sleep([retry_after || 2, 30].min) if env&.status == 429
+            Rails.logger.warn("[Gemini::HttpClient] Retry ##{retries} for #{@model}: status=#{env&.status} exc=#{exc&.message}")
           }
         }
         f.options.timeout = @timeout
@@ -89,13 +98,106 @@ module Gemini
 
       raise ApiError.new("No content in Gemini response") unless text
 
-      # Strip markdown code fences if present (e.g. ```json ... ```)
-      cleaned = text.strip.sub(/\A```(?:json)?\s*/, '').sub(/\s*```\z/, '')
+      parse_json_payload(text)
+    end
+
+    def parse_json_payload(text)
+      cleaned = text.strip.sub(/\A```(?:json)?\s*/i, '').sub(/\s*```\z/, '').strip
 
       begin
-        JSON.parse(cleaned)
+        return JSON.parse(cleaned)
       rescue JSON::ParserError
+        # 1. Try repairing cleaned payload (e.g. truncated closing brackets/quotes or trailing commas)
+        repaired = repair_json_string(cleaned)
+        return JSON.parse(repaired) if repaired
+
+        # 2. Try extracting JSON structure if prose surrounded the payload
+        extracted = extract_json_structure(cleaned)
+        if extracted && extracted != cleaned
+          begin
+            return JSON.parse(extracted)
+          rescue JSON::ParserError
+            repaired_extracted = repair_json_string(extracted)
+            return JSON.parse(repaired_extracted) if repaired_extracted
+          end
+        end
+
         cleaned
+      end
+    end
+
+    def extract_json_structure(text)
+      first_brace = text.index('{')
+      first_bracket = text.index('[')
+
+      return nil if first_brace.nil? && first_bracket.nil?
+
+      if first_brace && (first_bracket.nil? || first_brace < first_bracket)
+        last_brace = text.rindex('}')
+        return text[first_brace..last_brace] if last_brace && last_brace > first_brace
+      elsif first_bracket
+        last_bracket = text.rindex(']')
+        return text[first_bracket..last_bracket] if last_bracket && last_bracket > first_bracket
+      end
+
+      nil
+    end
+
+    def repair_json_string(raw)
+      sanitized = raw.gsub(/,\s*([\}\]])/, '\1')
+
+      begin
+        JSON.parse(sanitized)
+        return sanitized
+      rescue JSON::ParserError
+        salvage_truncated(sanitized)
+      end
+    end
+
+    def salvage_truncated(str)
+      in_string = false
+      escaped = false
+      stack = []
+
+      str.each_char do |char|
+        if escaped
+          escaped = false
+          next
+        end
+
+        if char == '\\'
+          escaped = true
+          next
+        end
+
+        if char == '"'
+          in_string = !in_string
+          next
+        end
+
+        next if in_string
+
+        if char == '{' || char == '['
+          stack.push(char)
+        elsif char == '}' && stack.last == '{'
+          stack.pop
+        elsif char == ']' && stack.last == '['
+          stack.pop
+        end
+      end
+
+      repaired = str.dup
+      repaired << '"' if in_string
+
+      stack.reverse_each do |bracket|
+        repaired << (bracket == '{' ? '}' : ']')
+      end
+
+      begin
+        JSON.parse(repaired)
+        repaired
+      rescue JSON::ParserError
+        nil
       end
     end
   end

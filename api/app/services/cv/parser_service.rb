@@ -13,6 +13,7 @@ module Cv
 
     def call
       raw_text = read_input
+      raw_text = extract_pdf_prose(raw_text) if raw_text.start_with?('%PDF-')
       normalize_text(raw_text)
     end
 
@@ -35,6 +36,17 @@ module Cv
       string.length < 1024 && !string.include?("\n") && File.exist?(string)
     rescue SystemCallError
       false
+    end
+
+    def extract_pdf_prose(pdf_content)
+      extracted = []
+      pdf_content.scan(/\(([^)\\]{2,})\)/) do |match|
+        candidate = match.first.strip
+        next if candidate.length < 2 || candidate =~ /^(Identity-H|WinAnsiEncoding|DeviceRGB|Filter|FlateDecode|FontDescriptor|Type0)/i
+
+        extracted << candidate
+      end
+      extracted.presence ? extracted.join(' ') : ''
     end
 
     def normalize_text(text)

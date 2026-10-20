@@ -135,7 +135,15 @@ export interface Vacancy {
 
 export interface VacancySkill {
   id?: number;
-  skill_id?: number | null;
+  skill_id?: string | number | null;
+  category?: string;
+  scope_include?: string;
+  scope_exclude?: string;
+  l1_anchor?: string;
+  l2_anchor?: string;
+  l3_anchor?: string;
+  l4_anchor?: string;
+  l5_anchor?: string;
   skill_label: string;
   is_custom?: boolean;
   expected_level: number;

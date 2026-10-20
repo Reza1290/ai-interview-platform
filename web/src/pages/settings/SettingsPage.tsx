@@ -1,44 +1,18 @@
-import { useAtomValue } from "jotai";
-import { tenantAtom } from "@/stores/tenantAtom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import AiSettingsSection from "./AiSettingsSection";
 
 export default function SettingsPage() {
-  const tenant = useAtomValue(tenantAtom);
-
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-7xl mx-auto w-full">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Organization Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your organization profile, assessment preferences, and data privacy policies.
+        <p className="text-sm text-muted-foreground mt-1">
+          Configure tenant-specific AI models, prompt speech engines, and candidate data compliance.
         </p>
       </div>
 
       <div className="grid gap-6">
         <AiSettingsSection />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Tenant Profile</CardTitle>
-            <CardDescription>
-              Multi-tenant workspace identifiers used for role-based scoping and audit logging.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Organization Name</Label>
-                <div className="text-sm font-medium mt-1">{tenant.name || "Default Organization"}</div>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Tenant Identifier</Label>
-                <div className="text-sm font-mono mt-1">{tenant.id || "system-default"}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>

@@ -7,6 +7,7 @@ Rails.application.routes.draw do
     namespace :v1 do
       # Auth
       post 'auth/login', to: 'authentication#authenticate'
+      get  'auth/me',    to: 'authentication#me'
       # Health check
       get  'health', to: proc { [200, {}, [{ status: 'ok' }.to_json]] }
 
@@ -44,9 +45,13 @@ Rails.application.routes.draw do
         end
       end
 
-      # B7 Skill Taxonomy (read-only reference data)
-      get  'skill_taxonomies',          to: 'skill_taxonomies#index'
-      get  'skill_taxonomies/:skill_id', to: 'skill_taxonomies#show', as: :skill_taxonomy
+      # B7 Skill Taxonomy
+      get    'skill_taxonomies',          to: 'skill_taxonomies#index'
+      post   'skill_taxonomies',          to: 'skill_taxonomies#create'
+      post   'skill_taxonomies/bulk',     to: 'skill_taxonomies#bulk_create'
+      get    'skill_taxonomies/:skill_id', to: 'skill_taxonomies#show', as: :skill_taxonomy
+      patch  'skill_taxonomies/:skill_id', to: 'skill_taxonomies#update'
+      delete 'skill_taxonomies/:skill_id', to: 'skill_taxonomies#destroy'
 
       # Vacancies
       resources :vacancies

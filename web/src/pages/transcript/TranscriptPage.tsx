@@ -42,20 +42,24 @@ export default function TranscriptPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto w-full space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Link
-            to={`/assessments/${id}/sessions/${sessionId}/portfolio`}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" asChild>
+            <Link
+              to={`/assessments/${id}/sessions/${sessionId}/portfolio`}
+              title="Back to Portfolio"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
           <div>
-            <h1 className="text-lg font-semibold">Interview Transcript</h1>
-            {candidateName && (
-              <p className="text-sm text-muted-foreground">{candidateName}</p>
-            )}
+            <h1 className="text-2xl font-bold tracking-tight">Interview Transcript</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {candidateName && <span>{candidateName}</span>}
+              {candidateName && " — "}
+              Complete conversational turn history and speech timestamps.
+            </p>
           </div>
         </div>
         {!loading && !error && turns.length > 0 && (

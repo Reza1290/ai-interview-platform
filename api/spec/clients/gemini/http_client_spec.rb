@@ -59,4 +59,75 @@ RSpec.describe Gemini::HttpClient do
       expect(client.model).to eq('explicit-model-pro')
     end
   end
+
+  describe '#generate_content' do
+    let(:client) { described_class.new(organization: custom_org) }
+
+    it 'sends JSON mime type and maxOutputTokens in generationConfig' do
+      connection = client.instance_variable_get(:@connection)
+
+      expect(connection).to receive(:post) do |_url, body, _headers|
+        parsed_body = JSON.parse(body)
+        config = parsed_body['generationConfig']
+        expect(config['responseMimeType']).to eq('application/json')
+        expect(config['maxOutputTokens']).to eq(8192)
+        expect(config['temperature']).to eq(0.2)
+
+        double(
+          success?: true,
+          status: 200,
+          body: {
+            candidates: [
+              { content: { parts: [{ text: '{"configured_skills":[]}' }] } }
+            ]
+          }.to_json
+        )
+      end
+
+      result = client.generate_content('test prompt')
+      expect(result).to eq({ 'configured_skills' => [] })
+    end
+
+    it 'parses and strips markdown code fences from the response' do
+      connection = client.instance_variable_get(:@connection)
+      fenced_payload = "```json\n{\"skills\": [\"React\"]}\n```"
+
+      allow(connection).to receive(:post).and_return(
+        double(
+          success?: true,
+          status: 200,
+          body: {
+            candidates: [
+              { content: { parts: [{ text: fenced_payload }] } }
+            ]
+          }.to_json
+        )
+      )
+
+      result = client.generate_content('test prompt')
+      expect(result).to eq({ 'skills' => ['React'] })
+    end
+
+    it 'repairs truncated JSON payloads with open string quotes and unclosed braces' do
+      connection = client.instance_variable_get(:@connection)
+      # Truncated JSON missing closing quote and closing bracket/brace
+      truncated_payload = '{"configured_skills": [{"skill_id": "sk-1", "evidence": ["truncated quote'
+
+      allow(connection).to receive(:post).and_return(
+        double(
+          success?: true,
+          status: 200,
+          body: {
+            candidates: [
+              { content: { parts: [{ text: truncated_payload }] } }
+            ]
+          }.to_json
+        )
+      )
+
+      result = client.generate_content('test prompt')
+      expect(result).to be_a(Hash)
+      expect(result.dig('configured_skills', 0, 'skill_id')).to eq('sk-1')
+    end
+  end
 end

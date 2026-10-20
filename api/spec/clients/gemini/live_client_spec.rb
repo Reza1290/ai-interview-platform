@@ -40,6 +40,7 @@ RSpec.describe Gemini::LiveClient do
       expect(client.api_key).to eq('AIzaSyAcmeCustomEnterpriseKey')
       expect(client.model).to eq('gemini-custom-live-model')
       expect(client.voice).to eq('Fenrir')
+      expect(client.language).to eq('id')
     end
 
     it 'falls back to ENV and default voice when organization has no custom AI config' do
@@ -63,12 +64,58 @@ RSpec.describe Gemini::LiveClient do
         api_key: 'AIzaSyExplicitOverrideKey',
         model: 'explicit-model-name',
         voice: 'Charon',
+        language: 'en',
         system_prompt: 'Test prompt'
       )
 
       expect(client.api_key).to eq('AIzaSyExplicitOverrideKey')
       expect(client.model).to eq('explicit-model-name')
       expect(client.voice).to eq('Charon')
+      expect(client.language).to eq('en')
+    end
+  end
+
+  describe '#send_setup' do
+    let(:client_id) do
+      described_class.new(
+        organization: custom_org,
+        system_prompt: 'Assessment in Indonesian',
+        language: 'id'
+      )
+    end
+
+    let(:client_en) do
+      described_class.new(
+        organization: custom_org,
+        system_prompt: 'Assessment in English',
+        language: 'en'
+      )
+    end
+
+    it 'configures inputAudioTranscription with bilingual hints for Indonesian' do
+      mock_ws = instance_double(Faye::WebSocket::Client)
+      client_id.instance_variable_set(:@ws, mock_ws)
+
+      expect(mock_ws).to receive(:send) do |json_str|
+        payload = JSON.parse(json_str)
+        tx_config = payload.dig('setup', 'inputAudioTranscription')
+        expect(tx_config['languageCodes']).to eq(['id-ID', 'en-US'])
+      end
+
+      client_id.send(:send_setup)
+    end
+
+    it 'configures inputAudioTranscription with en-US hint for English' do
+      mock_ws = instance_double(Faye::WebSocket::Client)
+      client_en.instance_variable_set(:@ws, mock_ws)
+
+      expect(mock_ws).to receive(:send) do |json_str|
+        payload = JSON.parse(json_str)
+        tx_config = payload.dig('setup', 'inputAudioTranscription')
+        expect(tx_config['languageCodes']).to eq(['en-US'])
+      end
+
+      client_en.send(:send_setup)
     end
   end
 end

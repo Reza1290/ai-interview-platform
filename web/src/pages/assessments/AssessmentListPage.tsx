@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/ui/pagination";
 import { assessmentsApi } from "@/services/assessments";
@@ -51,8 +50,13 @@ export default function AssessmentListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Assessments</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Assessments</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage interview assessments, target rubrics, and candidate sessions.
+          </p>
+        </div>
         <Button onClick={() => navigate("/assessments/new")}>
           <Plus className="h-4 w-4 mr-1.5" /> New Assessment
         </Button>
@@ -66,7 +70,7 @@ export default function AssessmentListPage() {
 
       {loading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
         </div>
       ) : assessments.length === 0 ? (
         <div className="border rounded-lg p-12 text-center text-sm text-muted-foreground">
@@ -76,33 +80,60 @@ export default function AssessmentListPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-2">
-          {assessments.map((a) => (
-            <Card
-              key={a.id}
-              className="cursor-pointer hover:border-primary/40 transition-colors"
-              onClick={() => navigate(`/assessments/${a.id}/invite`)}
-            >
-              <CardContent className="py-3 px-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">{a.name}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {a.time_limit_min} min
-                    </span>
-                    {a.latest_session && (
-                      <>
-                        <span>·</span>
+        <div className="border rounded-lg overflow-hidden bg-background">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-muted/50 border-b text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="py-3 px-4 font-semibold">Assessment / Role</th>
+                  <th className="py-3 px-4 font-semibold">Time Limit</th>
+                  <th className="py-3 px-4 font-semibold">Latest Session Status</th>
+                  <th className="py-3 px-4 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {assessments.map((a) => (
+                  <tr
+                    key={a.id}
+                    className="hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/assessments/${a.id}/invite`)}
+                  >
+                    <td className="py-3.5 px-4">
+                      <div className="font-medium text-foreground">{a.name}</div>
+                      <div className="text-xs text-muted-foreground">ID: #{a.id}</div>
+                    </td>
+                    <td className="py-3.5 px-4 text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                        {a.time_limit_min} min
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-xs">
+                      {a.latest_session ? (
                         <SessionSummary session={a.latest_session} />
-                      </>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          ))}
+                      ) : (
+                        <span className="text-muted-foreground">Awaiting candidate</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        title="Manage assessment"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/assessments/${a.id}/invite`);
+                        }}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
