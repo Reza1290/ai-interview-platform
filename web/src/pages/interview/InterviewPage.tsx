@@ -13,6 +13,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import VoiceBars from "@/components/interview/VoiceBars";
+import VoiceActivityHalo from "@/components/interview/VoiceActivityHalo";
+import LiveCaptionsOverlay from "@/components/interview/LiveCaptionsOverlay";
+import TranscriptDrawer from "@/components/interview/TranscriptDrawer";
 import InterviewTimer from "@/components/interview/InterviewTimer";
 import ConnectionStatus from "@/components/interview/ConnectionStatus";
 import TranscriptBubble from "@/components/interview/TranscriptBubble";
@@ -21,7 +24,7 @@ import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { useAudioWebSocket } from "@/hooks/useAudioWebSocket";
 import { sessionsApi } from "@/services/sessions";
 import HardwareCheck from "@/components/HardwareCheck";
-import { CheckCircle, Mic, MicOff } from "lucide-react";
+import { CheckCircle, Mic, MicOff, MessageSquare, Subtitles } from "lucide-react";
 import type { CandidateInfo, InterviewState, InterviewSpeaker, TranscriptTurn } from "@/types";
 
 export default function InterviewPage() {
@@ -31,6 +34,9 @@ export default function InterviewPage() {
   const [interviewState, setInterviewState] = useState<InterviewState>("idle");
   const [speaker, setSpeaker] = useState<InterviewSpeaker>(null);
   const [transcript, setTranscript] = useState<Pick<TranscriptTurn, "speaker" | "text">[]>([]);
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(true);
+  const [unreadTranscriptCount, setUnreadTranscriptCount] = useState(0);
   const [hardwareCheckDone, setHardwareCheckDone] = useState(false); // kept for green banner
   const [connectionLostLong, setConnectionLostLong] = useState(false);
   const [reconnectedPrompt, setReconnectedPrompt] = useState(false);
@@ -135,7 +141,13 @@ export default function InterviewPage() {
   }, []);
 
   const handleTranscript = useCallback((turn: Pick<TranscriptTurn, "speaker" | "text">) => {
-    setTranscript((prev) => [...prev.slice(-9), turn]); // keep last 10
+    setTranscript((prev) => [...prev.slice(-19), turn]);
+    setIsTranscriptOpen((isOpen) => {
+      if (!isOpen) {
+        setUnreadTranscriptCount((c) => c + 1);
+      }
+      return isOpen;
+    });
   }, []);
 
   const { playChunk, stop: stopPlayback, scheduleAfterPlayback, waitForDrain, cancelDrain } = useAudioPlayback();
@@ -502,47 +514,70 @@ export default function InterviewPage() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 py-4 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-between py-4 overflow-hidden relative">
         {interviewState === "connecting" ? (
-          <div className="text-sm text-muted-foreground animate-pulse">Connecting...</div>
-        ) : interviewState === "draining_audio" ? (
-          <div className="flex flex-col items-center gap-2 text-center">
-            <VoiceBars active={true} label="AI speaking" variant="ai" />
-            <p className="text-xs text-muted-foreground">Wrapping up...</p>
+          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground animate-pulse">
+            Connecting to interview session...
           </div>
         ) : (
-          <>
-            <div className="shrink-0 flex flex-col items-center gap-4">
-              <VoiceBars
-                active={aiSpeaking}
-                label={aiSpeaking ? "AI speaking" : "Listening..."}
-                variant="ai"
-              />
-
-              {candidateSpeaking && (
-                <VoiceBars
-                  active={true}
-                  label="You're speaking"
-                  variant="candidate"
-                />
-              )}
-            </div>
-
-            {transcript.length > 0 && (
-              <div className="w-full flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
-                {transcript.map((turn, i) => (
-                  <TranscriptBubble key={i} speaker={turn.speaker} text={turn.text} />
-                ))}
-              </div>
-            )}
-          </>
+          <div className="flex-1 flex flex-col items-center justify-center w-full">
+            <VoiceActivityHalo
+              speaker={speaker}
+              label={
+                interviewState === "draining_audio"
+                  ? "Wrapping up..."
+                  : speaker === "ai"
+                  ? "AI Speaking"
+                  : speaker === "candidate"
+                  ? "You're Speaking"
+                  : "Listening..."
+              }
+            />
+          </div>
         )}
+
+        {/* Live floating subtitles / captions overlay */}
+        <div className="w-full shrink-0 mb-2">
+          <LiveCaptionsOverlay
+            latestTurn={transcript[transcript.length - 1]}
+            enabled={showCaptions}
+          />
+        </div>
       </div>
 
       <div className="border-t py-3 flex items-center justify-between gap-4 bg-white shrink-0">
         <ConnectionStatus state={wsConnectionStatus} />
 
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCaptions((prev) => !prev)}
+            className={showCaptions ? "text-primary" : "text-muted-foreground"}
+            title={showCaptions ? "Hide captions" : "Show captions"}
+          >
+            <Subtitles className="h-3.5 w-3.5 mr-1.5" />
+            {showCaptions ? "CC On" : "CC Off"}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsTranscriptOpen(true);
+              setUnreadTranscriptCount(0);
+            }}
+            className="relative"
+          >
+            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+            Transcript
+            {unreadTranscriptCount > 0 && !isTranscriptOpen && (
+              <span className="ml-1.5 px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full">
+                {unreadTranscriptCount}
+              </span>
+            )}
+          </Button>
+
           <Button
             variant={micMuted ? "destructive" : "outline"}
             size="sm"
@@ -580,6 +615,13 @@ export default function InterviewPage() {
         )}
         </div>
       </div>
+
+      {/* Slide-out transcript drawer */}
+      <TranscriptDrawer
+        open={isTranscriptOpen}
+        onClose={() => setIsTranscriptOpen(false)}
+        transcript={transcript}
+      />
 
     </div>
   );
