@@ -10,10 +10,11 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_05_07_000000) do
+ActiveRecord::Schema[7.0].define(version: 2026_05_08_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
+  enable_extension "vector"
 
   # Custom types defined in this database.
   # Note that some types may not work with other database engines. Be careful if changing database.
@@ -67,6 +68,9 @@ ActiveRecord::Schema[7.0].define(version: 2026_05_07_000000) do
     t.check_constraint "ai_level IS NULL OR ai_level >= 1 AND ai_level <= 5", name: "chk_overrides_ai_level"
     t.check_constraint "override_level >= 1 AND override_level <= 5", name: "chk_overrides_override_level"
   end
+
+# Could not dump table "candidate_cv_chunks" because of following StandardError
+#   Unknown type 'vector(768)' for column 'embedding'
 
   create_table "coverage_maps", force: :cascade do |t|
     t.bigint "session_id", null: false
@@ -210,6 +214,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_05_07_000000) do
 
   add_foreign_key "assessment_skills", "assessments"
   add_foreign_key "assessor_overrides", "portfolio_skills"
+  add_foreign_key "candidate_cv_chunks", "organizations", column: "tenant_id", on_delete: :cascade
+  add_foreign_key "candidate_cv_chunks", "sessions", on_delete: :cascade
   add_foreign_key "coverage_maps", "sessions"
   add_foreign_key "fit_gap_reports", "portfolios"
   add_foreign_key "fit_gap_reports", "vacancies"
