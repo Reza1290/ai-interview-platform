@@ -35,7 +35,7 @@ export default function LevelBadge({ level, size = "md", className }: LevelBadge
         className
       )}
     >
-      <span>{LEVEL_LABELS[level] || `L${level}`}</span>
+      <span>{LEVEL_LABELS[level] || (level != null && !isNaN(Number(level)) ? `L${level}` : "-")}</span>
       {size === "md" && (
         <span className="text-[10px] font-normal opacity-70">
           {LEVEL_DESCRIPTIONS[level] || ""}

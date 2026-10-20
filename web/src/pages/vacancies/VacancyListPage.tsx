@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { ErrorState } from "@/components/ui/error-state";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,8 +17,9 @@ export default function VacancyListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
 
-  useEffect(() => {
+  const loadVacancies = useCallback(() => {
     setLoading(true);
+    setError(false);
     vacanciesApi
       .list(currentPage)
       .then((res) => {
@@ -27,6 +29,10 @@ export default function VacancyListPage() {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [currentPage]);
+
+  useEffect(() => {
+    loadVacancies();
+  }, [loadVacancies]);
 
   return (
     <div className="space-y-4">
@@ -43,14 +49,44 @@ export default function VacancyListPage() {
       </div>
 
       {error && (
-        <div className="border border-destructive/40 rounded-lg p-4 text-sm text-destructive">
-          Failed to load vacancies. Please refresh the page.
-        </div>
+        <ErrorState
+          title="Failed to load vacancies"
+          description="An error occurred while fetching vacancies. Please check your connection and try again."
+          onRetry={loadVacancies}
+        />
       )}
 
       {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+        <div className="border rounded-lg overflow-hidden bg-background">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-muted/50 border-b text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="py-3 px-4 font-semibold">Role Title</th>
+                <th className="py-3 px-4 font-semibold">Competencies</th>
+                <th className="py-3 px-4 font-semibold">Culture Expectations</th>
+                <th className="py-3 px-4 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {[1, 2, 3, 4].map((i) => (
+                <tr key={i}>
+                  <td className="py-3.5 px-4 space-y-1.5">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-16" />
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <Skeleton className="h-4 w-28" />
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <Skeleton className="h-4 w-48" />
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <Skeleton className="h-8 w-20 ml-auto rounded-md" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : vacancies.length === 0 ? (
         <div className="border rounded-lg p-12 text-center text-sm text-muted-foreground">

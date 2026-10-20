@@ -24,6 +24,7 @@ import { useAudioWebSocket } from "@/hooks/useAudioWebSocket";
 import { sessionsApi } from "@/services/sessions";
 import HardwareCheck from "@/components/HardwareCheck";
 import {
+  AlertCircle,
   CheckCircle,
   Mic,
   MicOff,
@@ -546,12 +547,12 @@ export default function InterviewPage() {
       {interviewState === "reconnecting" && (
         connectionLostLong ? (
           <div className="flex items-center gap-2 text-xs bg-red-50 border-b border-red-200 text-red-800 px-4 py-2 shrink-0">
-            <span className="animate-pulse">●</span>
+            <AlertCircle className="h-3.5 w-3.5 animate-pulse shrink-0" />
             <span>Connection interrupted. Attempting to restore session...</span>
           </div>
         ) : (
           <div className="flex items-center gap-2 text-xs bg-amber-50 border-b border-amber-200 text-amber-800 px-4 py-2 shrink-0">
-            <span className="animate-pulse">●</span>
+            <AlertCircle className="h-3.5 w-3.5 animate-pulse shrink-0" />
             <span>Briefly reconnecting audio channel — please wait.</span>
           </div>
         )

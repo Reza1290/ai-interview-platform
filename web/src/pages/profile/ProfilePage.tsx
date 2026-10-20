@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import { authAtom, clearToken } from "@/stores/authAtom";
 import { tenantAtom } from "@/stores/tenantAtom";
 import { authApi } from "@/services/auth";
@@ -8,13 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LogOut, ShieldCheck, Building2, User } from "lucide-react";
 
 export default function ProfilePage() {
   const [auth, setAuth] = useAtom(authAtom);
   const [tenant, setTenant] = useAtom(tenantAtom);
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Refresh current user and tenant context from backend API
@@ -46,7 +47,22 @@ export default function ProfilePage() {
   const user = auth.user;
   const userEmail = user?.email || "admin@example.com";
   const userRole = user?.role || "admin";
-  const userId = user?.id ?? 1;
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto w-full">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <div className="grid gap-6">
+          <Skeleton className="h-44 w-full rounded-xl" />
+          <Skeleton className="h-44 w-full rounded-xl" />
+          <Skeleton className="h-44 w-full rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full">
@@ -72,7 +88,7 @@ export default function ProfilePage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-xs text-muted-foreground">Email Address</Label>
                 <div className="text-sm font-medium mt-1">{userEmail}</div>
@@ -83,17 +99,6 @@ export default function ProfilePage() {
                   <Badge variant="secondary" className="capitalize text-xs font-semibold">
                     {userRole}
                   </Badge>
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">User ID</Label>
-                <div className="text-sm font-mono mt-1">#{userId}</div>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Status</Label>
-                <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Active Session
                 </div>
               </div>
             </div>
@@ -141,17 +146,18 @@ export default function ProfilePage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>• Your session is authenticated via signed HMAC-SHA256 JWT bearer credentials.</p>
-              <p>• Scoped multi-tenant data access enforced under UU PDP No. 27/2022 standards.</p>
+            <div className="text-xs text-muted-foreground leading-relaxed">
+              Your session is protected by cryptographic JWT credentials scoped to this tenant workspace. In accordance with UU PDP No. 27/2022 standards, candidate evaluation records are protected with tenant-level access boundaries.
             </div>
             <div className="pt-2">
               <Button
                 variant="outline"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 gap-2"
+                size="sm"
                 onClick={handleLogout}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
               >
-                <LogOut className="h-4 w-4" /> Log out
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out of Platform
               </Button>
             </div>
           </CardContent>

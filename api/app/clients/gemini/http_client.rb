@@ -73,12 +73,7 @@ module Gemini
           interval_randomness: 0.5,
           backoff_factor: 2,
           retry_statuses: [429, 500, 502, 503],
-          methods: %i[delete get head options put trace post],
-          retry_block: ->(env, _opts, retries, exc) {
-            retry_after = env&.response_headers&.[]('retry-after')&.to_i
-            sleep([retry_after || 2, 30].min) if env&.status == 429
-            Rails.logger.warn("[Gemini::HttpClient] Retry ##{retries} for #{@model}: status=#{env&.status} exc=#{exc&.message}")
-          }
+          methods: %i[delete get head options put trace post]
         }
         f.options.timeout = @timeout
         f.options.open_timeout = 10
