@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   Dialog,
   DialogContent,
@@ -256,10 +257,39 @@ export default function AssessmentInvitePage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto w-full space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
+      <div className="max-w-7xl mx-auto w-full space-y-6">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-80" />
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6 space-y-3">
+            <Skeleton className="h-5 w-32" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-6 w-28 rounded-full" />
+            </div>
+          </CardContent>
+        </Card>
+        <div className="border rounded-lg overflow-hidden bg-background">
+          <div className="p-4 border-b">
+            <Skeleton className="h-5 w-40" />
+          </div>
+          <div className="divide-y">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 flex items-center justify-between">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <Skeleton className="h-8 w-24 rounded-md" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -283,11 +313,11 @@ export default function AssessmentInvitePage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate(`/assessments/${id}/edit`)}>
-            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+          <Button variant="outline" onClick={() => navigate(`/assessments/${id}/edit`)}>
+            <Pencil className="h-4 w-4 mr-1.5" /> Edit
           </Button>
-          <Button size="sm" onClick={openInviteDialog} disabled={creatingSession}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
+          <Button onClick={openInviteDialog} disabled={creatingSession}>
+            <Plus className="h-4 w-4 mr-1.5" />
             {creatingSession ? "Creating..." : "Invite Candidate"}
           </Button>
         </div>

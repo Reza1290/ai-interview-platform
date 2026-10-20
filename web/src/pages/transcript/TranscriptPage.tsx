@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { ErrorState } from "@/components/ui/error-state";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,7 +15,9 @@ export default function TranscriptPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const loadTranscript = useCallback(() => {
+    setLoading(true);
+    setError(false);
     Promise.all([
       sessionsApi.getTranscript(Number(sessionId)),
       sessionsApi.get(Number(sessionId)),
@@ -26,6 +29,10 @@ export default function TranscriptPage() {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [sessionId]);
+
+  useEffect(() => {
+    loadTranscript();
+  }, [loadTranscript]);
 
   const handleDownload = () => {
     const lines = turns.map((t) => {
@@ -63,25 +70,39 @@ export default function TranscriptPage() {
           </div>
         </div>
         {!loading && !error && turns.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleDownload}>
-            <Download className="h-3.5 w-3.5 mr-1.5" />
+          <Button variant="outline" onClick={handleDownload}>
+            <Download className="h-4 w-4 mr-1.5" />
             Download .txt
           </Button>
         )}
       </div>
 
       {loading && (
-        <div className="space-y-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className={`rounded-lg p-4 space-y-2 border ${
+                i % 2 === 1 ? "bg-muted/40" : "bg-background ml-8"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
           ))}
         </div>
       )}
 
       {!loading && error && (
-        <div className="border rounded-lg p-6 text-center text-sm text-destructive">
-          Failed to load transcript. Please refresh.
-        </div>
+        <ErrorState
+          title="Failed to load transcript"
+          description="Could not load conversational transcript turns and timestamps for this session."
+          onRetry={loadTranscript}
+        />
       )}
 
       {!loading && !error && turns.length === 0 && (

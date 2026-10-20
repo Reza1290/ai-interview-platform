@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AiSettingsSection() {
   const [config, setConfig] = useState<OrganizationAiConfig | null>(null);
@@ -71,7 +72,17 @@ export default function AiSettingsSection() {
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="py-6 text-sm text-muted-foreground">Loading AI configuration...</CardContent>
+        <CardContent className="py-6 space-y-4">
+          <p className="text-sm text-muted-foreground">Loading AI configuration...</p>
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </CardContent>
       </Card>
     );
   }

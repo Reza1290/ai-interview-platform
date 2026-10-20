@@ -38,22 +38,20 @@ describe("ProfilePage - User Profile & Tenant Information", () => {
       </MemoryRouter>
     );
 
-    // Verify User Profile header
-    expect(screen.getByRole("heading", { name: "User Profile" })).toBeInTheDocument();
-
-    // Verify Account Details
-    expect(screen.getByText("Account Details")).toBeInTheDocument();
-    expect(screen.getByText("admin@example.com")).toBeInTheDocument();
-
-    // Verify Tenant Profile section moved from Settings
+    // Verify User Profile header and details after loading
     await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "User Profile" })).toBeInTheDocument();
+      expect(screen.getByText("Account Details")).toBeInTheDocument();
+      expect(screen.getByText("admin@example.com")).toBeInTheDocument();
       expect(screen.getByText("Tenant Profile")).toBeInTheDocument();
       expect(screen.getByText("Test Corp")).toBeInTheDocument();
       expect(screen.getByText("test-corp")).toBeInTheDocument();
+      expect(screen.getByText("Session Security")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Sign Out/i })).toBeInTheDocument();
     });
 
-    // Verify Session Security
-    expect(screen.getByText("Session Security")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Log out/i })).toBeInTheDocument();
+    // Ensure User ID and Status Active Session are removed
+    expect(screen.queryByText(/User ID/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Active Session/i)).not.toBeInTheDocument();
   });
 });

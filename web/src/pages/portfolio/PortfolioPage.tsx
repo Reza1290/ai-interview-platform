@@ -3,13 +3,15 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ErrorState } from "@/components/ui/error-state";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SkillPortfolioCard from "@/components/portfolio/SkillPortfolioCard";
 import { sessionsApi } from "@/services/sessions";
 import { vacanciesApi } from "@/services/vacancies";
 import { portfoliosApi } from "@/services/portfolios";
 import { usePolling } from "@/hooks/usePolling";
-import { ArrowLeft, Download, Loader2, RefreshCw, Zap, FileText } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Loader2, RefreshCw, Zap, FileText } from "lucide-react";
 import type { Portfolio, AssessorOverride, Vacancy } from "@/types";
 
 export default function PortfolioPage() {
@@ -96,10 +98,33 @@ export default function PortfolioPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto w-full space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-48 w-full" />
+      <div className="max-w-7xl mx-auto w-full space-y-6">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-3.5 w-24" />
+                  </div>
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
@@ -127,29 +152,27 @@ export default function PortfolioPage() {
         <div className="flex gap-2">
           <Link
             to={`/assessments/${id}/sessions/${sessionId}/transcript`}
-            className="inline-flex items-center gap-1 text-sm border rounded-md px-3 py-1.5 hover:bg-accent transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm border rounded-md px-4 py-2 hover:bg-accent transition-colors"
           >
-            <FileText className="h-3.5 w-3.5" />
+            <FileText className="h-4 w-4" />
             Transcript
           </Link>
           {!generating && portfolio && (
             <>
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => handleExport("pdf")}
                 disabled={!!exporting}
               >
-                {exporting === "pdf" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />}
+                {exporting === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
                 PDF
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => handleExport("json")}
                 disabled={!!exporting}
               >
-                {exporting === "json" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />}
+                {exporting === "json" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />}
                 JSON
               </Button>
             </>
@@ -172,19 +195,20 @@ export default function PortfolioPage() {
 
       {/* Failed state */}
       {!generating && portfolio?.generation_status === "failed" && (
-        <div className="border border-destructive/40 rounded-lg p-6 text-center space-y-3">
-          <p className="text-sm text-destructive">Portfolio generation failed.</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              await sessionsApi.regeneratePortfolio(Number(sessionId));
-              setGenerating(true);
-            }}
-          >
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retry
-          </Button>
-        </div>
+        <ErrorState
+          title="Portfolio generation failed"
+          description={
+            portfolio.generation_error && portfolio.generation_error.includes("Rate limited")
+              ? "Rate limit exceeded by Google Gemini API. Please wait for quota refresh or update the API Key in Settings."
+              : portfolio.generation_error
+              ? `Error: ${portfolio.generation_error}`
+              : "An error occurred while generating the portfolio report."
+          }
+          onRetry={async () => {
+            await sessionsApi.regeneratePortfolio(Number(sessionId));
+            setGenerating(true);
+          }}
+        />
       )}
 
       {/* Ready state */}
@@ -260,7 +284,8 @@ export default function PortfolioPage() {
               </SelectContent>
             </Select>
             <Button onClick={handleRunFitGap} disabled={!selectedVacancy}>
-              Run Fit/Gap Analysis →
+              <span>Run Fit/Gap Analysis</span>
+              <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           </div>
         </>

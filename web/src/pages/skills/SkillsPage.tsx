@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ui/error-state";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Dialog,
@@ -21,6 +23,7 @@ export default function SkillsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [fetchError, setFetchError] = useState(false);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -48,10 +51,11 @@ export default function SkillsPage() {
   const loadSkills = async () => {
     try {
       setLoading(true);
+      setFetchError(false);
       const res = await skillTaxonomiesApi.list();
       setSkills(res.data.skill_taxonomies || []);
     } catch {
-      // Retain previous state
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -251,6 +255,14 @@ export default function SkillsPage() {
       </div>
 
       {/* Skills Table */}
+      {fetchError && (
+        <ErrorState
+          title="Failed to load skills"
+          description="An error occurred while fetching the skill library. Please check your connection and try again."
+          onRetry={loadSkills}
+        />
+      )}
+
       <div className="border rounded-lg overflow-hidden bg-background">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -265,11 +277,29 @@ export default function SkillsPage() {
             </thead>
             <tbody className="divide-y">
               {loading ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                    Loading skills...
-                  </td>
-                </tr>
+                [1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i}>
+                    <td className="py-3.5 px-4 space-y-1.5">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="h-3 w-20" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Skeleton className="h-4 w-44" />
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Skeleton className="h-4 w-52" />
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                      </div>
+                    </td>
+                  </tr>
+                ))
               ) : filteredSkills.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-muted-foreground">
