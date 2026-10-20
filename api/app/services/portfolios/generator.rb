@@ -150,7 +150,7 @@ module Portfolios
     end
 
     def save_skills(portfolio, response)
-      data = response.is_a?(Hash) ? response : JSON.parse(response)
+      data = parse_payload(response)
 
       ActiveRecord::Base.transaction do
         existing_skills = portfolio.portfolio_skills.includes(:assessor_override).to_a
@@ -219,6 +219,29 @@ module Portfolios
           old_skill.destroy!
         end
       end
+    end
+
+    def parse_payload(response)
+      return response if response.is_a?(Hash)
+
+      if response.is_a?(String)
+        cleaned = response.strip.sub(/\A```(?:json)?\s*/i, '').sub(/\s*```\z/, '').strip
+        begin
+          parsed = JSON.parse(cleaned)
+          return parsed if parsed.is_a?(Hash)
+        rescue JSON::ParserError
+          if (match = cleaned.match(/(\{.*\})/m))
+            begin
+              parsed = JSON.parse(match[1])
+              return parsed if parsed.is_a?(Hash)
+            rescue JSON::ParserError
+              # fall through to error
+            end
+          end
+        end
+      end
+
+      raise ArgumentError, "Unable to parse valid JSON portfolio response: #{response.inspect.truncate(120)}"
     end
   end
 end

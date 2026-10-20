@@ -12,19 +12,29 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import VoiceBars from "@/components/interview/VoiceBars";
-import VoiceActivityHalo from "@/components/interview/VoiceActivityHalo";
+import ParticipantTiles from "@/components/interview/ParticipantTiles";
+import DeviceSettingsModal from "@/components/interview/DeviceSettingsModal";
 import LiveCaptionsOverlay from "@/components/interview/LiveCaptionsOverlay";
 import TranscriptDrawer from "@/components/interview/TranscriptDrawer";
 import InterviewTimer from "@/components/interview/InterviewTimer";
 import ConnectionStatus from "@/components/interview/ConnectionStatus";
-import TranscriptBubble from "@/components/interview/TranscriptBubble";
 import { useAudioCapture } from "@/hooks/useAudioCapture";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { useAudioWebSocket } from "@/hooks/useAudioWebSocket";
 import { sessionsApi } from "@/services/sessions";
 import HardwareCheck from "@/components/HardwareCheck";
-import { CheckCircle, Mic, MicOff, MessageSquare, Subtitles } from "lucide-react";
+import {
+  CheckCircle,
+  Mic,
+  MicOff,
+  MessageSquare,
+  Subtitles,
+  Settings as SettingsIcon,
+  PhoneOff,
+  Info,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import type { CandidateInfo, InterviewState, InterviewSpeaker, TranscriptTurn } from "@/types";
 
 export default function InterviewPage() {
@@ -37,6 +47,8 @@ export default function InterviewPage() {
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [showCaptions, setShowCaptions] = useState(true);
   const [unreadTranscriptCount, setUnreadTranscriptCount] = useState(0);
+  const [isDeviceSettingsOpen, setIsDeviceSettingsOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState("");
   const [hardwareCheckDone, setHardwareCheckDone] = useState(false); // kept for green banner
   const [connectionLostLong, setConnectionLostLong] = useState(false);
   const [reconnectedPrompt, setReconnectedPrompt] = useState(false);
@@ -50,6 +62,16 @@ export default function InterviewPage() {
   const [isUpdatingName, setIsUpdatingName] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch candidate info
   useEffect(() => {
@@ -150,7 +172,7 @@ export default function InterviewPage() {
     });
   }, []);
 
-  const { playChunk, stop: stopPlayback, scheduleAfterPlayback, waitForDrain, cancelDrain } = useAudioPlayback();
+  const { playChunk, stop: stopPlayback, scheduleAfterPlayback, waitForDrain, cancelDrain, getVolume: getAiVolume } = useAudioPlayback();
   const audioCompleteCalledRef = useRef(false);
   const audioCompleteSafetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -196,7 +218,7 @@ export default function InterviewPage() {
     onReconnected: handleReconnected,
   });
 
-  const { start: startCapture, stop: stopCapture, mute, unmute } = useAudioCapture({
+  const { start: startCapture, stop: stopCapture, mute, unmute, getVolume: getCandidateVolume } = useAudioCapture({
     onFrame: send,
   });
 
@@ -477,152 +499,206 @@ export default function InterviewPage() {
   }
 
   // ── States B/C/D/E: Active interview ────────────────────────────────────
-  const aiSpeaking = speaker === "ai";
-  const candidateSpeaking = speaker === "candidate";
+  const roomCode = token
+    ? `${token.slice(0, 3)}-${token.slice(3, 7)}-${token.slice(7, 10)}`
+    : "interview-room";
+  const candidateInitials = candidateInfo?.candidate_name
+    ? candidateInfo.candidate_name.slice(0, 1).toUpperCase()
+    : "K";
 
   return (
-    <div className="max-w-xl mx-auto px-4 flex flex-col h-full w-full overflow-hidden">
-      <div className="flex items-center justify-between py-3 border-b bg-white shrink-0 z-10">
-        <span className="text-sm font-medium">AI Interview</span>
-        {candidateInfo && (
-          <InterviewTimer
-            totalSeconds={candidateInfo.time_limit_min * 60}
-            running={interviewState === "active"}
-            onExpired={endInterview}
-          />
-        )}
-      </div>
+    <div className="flex flex-col h-screen w-full bg-slate-100 text-slate-900 overflow-hidden select-none">
+      {/* ── Top Bar (Google Meet Header — Clean, Not Forced Dark) ── */}
+      <header className="h-12 border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between bg-white shrink-0 z-20">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-mono text-slate-700 font-medium tracking-wider">
+            {currentTime || "13:48"}
+          </span>
+          <span className="text-slate-300">|</span>
+          <div className="flex items-center gap-1.5 text-xs text-slate-700">
+            <span className="font-mono font-medium">{roomCode}</span>
+            <span className="text-slate-400 text-[11px]">
+              ({candidateInfo?.assessment_name || "Assessment"})
+            </span>
+          </div>
+        </div>
 
+        <div className="flex items-center gap-3">
+          {candidateInfo && (
+            <InterviewTimer
+              totalSeconds={candidateInfo.time_limit_min * 60}
+              running={interviewState === "active"}
+              onExpired={endInterview}
+            />
+          )}
+          <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+            <div className="w-7 h-7 rounded-full bg-purple-700 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+              {candidateInitials}
+            </div>
+            <span className="text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+              <Users className="w-3 h-3" /> 2
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Reconnecting / Grace Banner */}
       {interviewState === "reconnecting" && (
         connectionLostLong ? (
-          <div className="flex items-center gap-2 text-sm bg-red-50 border border-red-200 text-red-800 rounded-lg px-4 py-2.5 mt-2 shrink-0">
+          <div className="flex items-center gap-2 text-xs bg-red-50 border-b border-red-200 text-red-800 px-4 py-2 shrink-0">
             <span className="animate-pulse">●</span>
-            <span>Connection is taking too long to restore. Please wait, and contact the interviewer if this persists.</span>
+            <span>Connection interrupted. Attempting to restore session...</span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-sm bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg px-4 py-2.5 mt-2 shrink-0">
+          <div className="flex items-center gap-2 text-xs bg-amber-50 border-b border-amber-200 text-amber-800 px-4 py-2 shrink-0">
             <span className="animate-pulse">●</span>
-            <span>Briefly reconnecting — please wait a moment.</span>
+            <span>Briefly reconnecting audio channel — please wait.</span>
           </div>
         )
       )}
 
-      {reconnectedPrompt && (
-        <div className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-4 py-2.5 mt-2 shrink-0">
-          <span>Reconnected — please say <strong>"check"</strong> or continue your answer to resume.</span>
-          <button className="ml-3 text-blue-500 hover:text-blue-700 shrink-0" onClick={() => setReconnectedPrompt(false)}>✕</button>
-        </div>
-      )}
-
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-between py-4 overflow-hidden relative">
+      {/* ── Main Stage (2 Participant Conference Squares) ── */}
+      <div className="flex-1 min-h-0 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden bg-slate-100/80">
         {interviewState === "connecting" ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground animate-pulse">
-            Connecting to interview session...
+          <div className="flex flex-col items-center gap-2 text-slate-500 animate-pulse text-sm">
+            <span>Connecting to interview room...</span>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center w-full">
-            <VoiceActivityHalo
-              speaker={speaker}
-              label={
-                interviewState === "draining_audio"
-                  ? "Wrapping up..."
-                  : speaker === "ai"
-                  ? "AI Speaking"
-                  : speaker === "candidate"
-                  ? "You're Speaking"
-                  : "Listening..."
-              }
-            />
-          </div>
+          <ParticipantTiles
+            candidateName={candidateInfo?.candidate_name}
+            speaker={speaker}
+            micMuted={micMuted}
+            getAiVolume={getAiVolume}
+            getCandidateVolume={getCandidateVolume}
+          />
         )}
 
-        {/* Live floating subtitles / captions overlay */}
-        <div className="w-full shrink-0 mb-2">
-          <LiveCaptionsOverlay
-            latestTurn={transcript[transcript.length - 1]}
-            enabled={showCaptions}
-          />
+        {/* Floating Captions (CC) Overlay */}
+        <div className="absolute bottom-4 left-0 right-0 z-20 pointer-events-none">
+          <div className="pointer-events-auto">
+            <LiveCaptionsOverlay
+              latestTurn={transcript[transcript.length - 1]}
+              enabled={showCaptions}
+            />
+          </div>
         </div>
       </div>
 
-      <div className="border-t py-3 flex items-center justify-between gap-4 bg-white shrink-0">
-        <ConnectionStatus state={wsConnectionStatus} />
-
+      {/* ── Bottom Controls Bar (Google Meet Floating Pill) ── */}
+      <footer className="h-16 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-white border-t border-slate-200 z-20">
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowCaptions((prev) => !prev)}
-            className={showCaptions ? "text-primary" : "text-muted-foreground"}
-            title={showCaptions ? "Hide captions" : "Show captions"}
-          >
-            <Subtitles className="h-3.5 w-3.5 mr-1.5" />
-            {showCaptions ? "CC On" : "CC Off"}
-          </Button>
+          <ConnectionStatus state={wsConnectionStatus} />
+        </div>
 
-          <Button
-            variant="outline"
-            size="sm"
+        {/* Centered Meeting Action Pill */}
+        <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 p-1 rounded-full border border-slate-200/80">
+          {/* Microphone Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleMic}
+            className={`p-2.5 sm:p-3 rounded-full transition-all duration-150 ${
+              micMuted
+                ? "bg-red-600 text-white hover:bg-red-700 shadow-sm"
+                : "bg-white text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200 shadow-sm"
+            }`}
+            title={micMuted ? "Unmute microphone" : "Mute microphone"}
+            aria-label={micMuted ? "Unmute microphone" : "Mute microphone"}
+          >
+            {micMuted ? <MicOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Mic className="h-4 w-4 sm:h-5 sm:w-5" />}
+          </button>
+
+          {/* Audio & Mic Settings Button */}
+          <button
+            type="button"
+            onClick={() => setIsDeviceSettingsOpen(true)}
+            className="p-2.5 sm:p-3 rounded-full bg-white text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200 shadow-sm transition-colors"
+            title="Microphone & Audio Device Settings"
+            aria-label="Microphone & Audio Device Settings"
+          >
+            <SettingsIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+          </button>
+
+          {/* Closed Captions Button */}
+          <button
+            type="button"
+            onClick={() => setShowCaptions((prev) => !prev)}
+            className={`p-2.5 sm:p-3 rounded-full transition-colors ${
+              showCaptions
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-white text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200 shadow-sm"
+            }`}
+            title={showCaptions ? "Hide closed captions" : "Show closed captions"}
+            aria-label={showCaptions ? "Hide closed captions" : "Show closed captions"}
+          >
+            <Subtitles className="h-4 w-4 sm:h-5 sm:w-5" />
+          </button>
+
+          {/* End Call Button */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                className="p-2.5 sm:p-3 px-4 sm:px-5 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                title="End interview"
+                aria-label="End interview"
+              >
+                <PhoneOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="text-xs font-semibold">End</span>
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>End interview?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to end the interview early?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={endInterview}>End interview</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+
+        {/* Right Control: In-Call Messages / Transcript Drawer */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
             onClick={() => {
-              setIsTranscriptOpen(true);
+              setIsTranscriptOpen((prev) => !prev);
               setUnreadTranscriptCount(0);
             }}
-            className="relative"
+            className={`p-2.5 sm:p-3 rounded-full relative transition-colors ${
+              isTranscriptOpen
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-white text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200 shadow-sm"
+            }`}
+            title="In-call messages"
+            aria-label="In-call messages"
           >
-            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-            Transcript
+            <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
             {unreadTranscriptCount > 0 && !isTranscriptOpen && (
-              <span className="ml-1.5 px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full">
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 bg-red-500 text-white text-[10px] font-bold rounded-full">
                 {unreadTranscriptCount}
               </span>
             )}
-          </Button>
-
-          <Button
-            variant={micMuted ? "destructive" : "outline"}
-            size="sm"
-            onClick={toggleMic}
-          >
-            {micMuted ? (
-              <><MicOff className="h-3.5 w-3.5 mr-1.5" /> Muted</>
-            ) : (
-              <><Mic className="h-3.5 w-3.5 mr-1.5" /> Mic On</>
-            )}
-          </Button>
-
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" size="sm">End Interview</Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>End interview?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to end the interview early?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={endInterview}>End interview</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        {import.meta.env.DEV && (
-          <Button variant="outline" size="sm" className="text-xs opacity-50"
-            onClick={() => sendJson({ type: "debug_force_reconnect" })}>
-            Force reconnect
-          </Button>
-        )}
+          </button>
         </div>
-      </div>
+      </footer>
 
-      {/* Slide-out transcript drawer */}
+      {/* Working Device & Mic Settings Modal */}
+      <DeviceSettingsModal
+        open={isDeviceSettingsOpen}
+        onOpenChange={setIsDeviceSettingsOpen}
+      />
+
+      {/* Slide-out In-Call Messages Transcript Drawer */}
       <TranscriptDrawer
         open={isTranscriptOpen}
         onClose={() => setIsTranscriptOpen(false)}
         transcript={transcript}
       />
-
     </div>
   );
 }

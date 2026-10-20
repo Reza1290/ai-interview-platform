@@ -36,5 +36,14 @@ RSpec.describe Cv::ParserService do
       expect(parsed).to include('Candidate Resume from stream')
       expect(parsed).to include('Skills: Ruby, PostgreSQL')
     end
+
+    it 'extracts readable text fragments when passed raw PDF bytecode' do
+      raw_pdf = "%PDF-1.7\n1 0 obj\n<</Type/Catalog>>\nendobj\n(Budi Santoso) Tj\n(Senior Software Engineer) Tj"
+      parsed = described_class.call(raw_pdf)
+
+      expect(parsed).not_to start_with('%PDF-1.7')
+      expect(parsed).to include('Budi Santoso')
+      expect(parsed).to include('Senior Software Engineer')
+    end
   end
 end

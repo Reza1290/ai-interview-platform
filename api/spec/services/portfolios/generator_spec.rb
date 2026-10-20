@@ -106,6 +106,34 @@ RSpec.describe Portfolios::Generator do
       expect(reloaded_skill.assessor_override.override_level).to eq(4)
       expect(reloaded_skill.assessor_override.assessor_notes).to include('Candidate demonstrated L4')
     end
+
+    it 'parses string payload wrapped in markdown code blocks' do
+      fenced_response = <<~FENCED
+        ```json
+        {
+          "configured_skills": [
+            {
+              "skill_id": "sk-01",
+              "skill_label": "Ruby on Rails",
+              "level": 4,
+              "confidence": "high",
+              "evidence": ["designed architectural patterns"],
+              "competency_summary": "Expert level Rails developer"
+            }
+          ],
+          "discovered_skills": []
+        }
+        ```
+      FENCED
+
+      allow(mock_gemini_client).to receive(:generate_content).and_return(fenced_response)
+
+      portfolio = generator.call
+      expect(portfolio.generation_status).to eq('complete')
+      skill = portfolio.portfolio_skills.find_by(skill_id: 'sk-01')
+      expect(skill.ai_level).to eq(4)
+      expect(skill.competency_summary).to eq('Expert level Rails developer')
+    end
   end
 
   describe 'multi-tenant HttpClient initialization (ENH-CFG-02)' do

@@ -143,18 +143,22 @@ export default function LiveMonitorPage() {
   const discoveredSkills = coverageMap?.discovered ?? [];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto w-full space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Link to={`/assessments/${id}/invite`} className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <h1 className="text-lg font-semibold">Live Monitor</h1>
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0" asChild>
+              <Link to={`/assessments/${id}/invite`} title="Back to Assessment">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight">Live Monitor</h1>
           </div>
           {assessmentName && (
-            <p className="text-sm text-muted-foreground pl-6">{assessmentName}</p>
+            <p className="text-sm text-muted-foreground mt-1 pl-6">
+              {assessmentName ? `${assessmentName} · ` : ""}Real-time candidate coverage telemetry and live transcript feed.
+            </p>
           )}
         </div>
 
